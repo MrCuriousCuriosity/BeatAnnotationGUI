@@ -34,11 +34,11 @@ class SpectrogramSettings:
     # Default settings
     DEFAULTS = {
         "colormap": "magma",
-        "min_freq": 0,
-        "max_freq": 8000,
+        "min_freq": 20,
+        "max_freq": 6000,
         "win_len": 2048,
         "hop_len": 512,
-        "db_range": 80,
+        "db_range": 60,
         "normalize": True,
     }
 

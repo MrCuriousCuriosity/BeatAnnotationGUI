@@ -24,6 +24,7 @@ spec_config = importlib.util.spec_from_file_location(
 spectogram_module = importlib.util.module_from_spec(spec_config)
 spec_config.loader.exec_module(spectogram_module)
 SpectrogramConfig = spectogram_module.SpectrogramConfig
+SpectrogramNavigator = spectogram_module.SpectrogramNavigator
 
 spec_toolbar = importlib.util.spec_from_file_location(
     "toolbar", current_dir / "010_TopToolBar.py"
@@ -45,15 +46,18 @@ class SpectrogramApp:
 
     # === DARK/LIGHT MODE ===
     DARK_MODE = True
-    
 
+    # === Main Window Layout ===
+    MAIN_WINDOW_WIDTH_PCT  = 0.6  # Starting screen width
+    MAIN_WINDOW_HEIGHT_PCT = 0.4  # Starting screen height
 
-    # UI Layout positioning variables
-    MAIN_WINDOW_WIDTH = 950
-    MAIN_WINDOW_HEIGHT = 600
-    FIGURE_WIDTH_PCT = 1.0   # fraction of MAIN_WINDOW_WIDTH
-    FIGURE_HEIGHT_PCT = 0.70  # fraction of MAIN_WINDOW_HEIGHT
+    # === Spectrogram Plot Layout ===
+    FIGURE_WIDTH_PCT  = 1.2
+    FIGURE_HEIGHT_PCT = 0.50
+    FIGURE_CENTER_X   = 0.5
+    FIGURE_CENTER_Y   = 0.3
     FIGURE_DPI = 100
+
     TOP_BAR_PADX = 10
     TOP_BAR_PADY = 10
 
@@ -68,7 +72,13 @@ class SpectrogramApp:
         """
         self.root = root
         self.root.title("Audio Spectrogram Viewer")
-        self.root.geometry(f"{self.MAIN_WINDOW_WIDTH}x{self.MAIN_WINDOW_HEIGHT}")
+
+        # Compute window size from screen dimensions
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+        self.window_width  = int(screen_w * self.MAIN_WINDOW_WIDTH_PCT)
+        self.window_height = int(screen_h * self.MAIN_WINDOW_HEIGHT_PCT)
+        self.root.geometry(f"{self.window_width}x{self.window_height}")
 
         # Audio state
         self.audio_mono = None
@@ -82,16 +92,18 @@ class SpectrogramApp:
         # Settings window state
         self._settings_window = None
 
-        # Create UI components
-        self._setup_toolbar()
+        # Navigator state
+        self.navigator = None
+
+        # Create UI components (canvas first, toolbar on top)
         self._setup_canvas()
+        self._setup_toolbar()
 
         # Apply colour theme
         self._apply_theme()
 
         # Clean shutdown
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
-
 
     # === DARK/LIGHT THEMES ===
     _DARK_THEME = {
@@ -125,7 +137,6 @@ class SpectrogramApp:
         self.ax.title.set_color(fg)
     # === ===
 
-
     def _setup_toolbar(self):
         """Set up the top toolbar with callbacks."""
         callbacks = {
@@ -134,17 +145,37 @@ class SpectrogramApp:
         }
         self.toolbar = TopToolBar(self.root, callbacks=callbacks)
 
-
     def _setup_canvas(self):
         """Set up the matplotlib canvas for spectrogram visualization."""
-        fig_w = (self.MAIN_WINDOW_WIDTH * self.FIGURE_WIDTH_PCT) / self.FIGURE_DPI
-        fig_h = (self.MAIN_WINDOW_HEIGHT * self.FIGURE_HEIGHT_PCT) / self.FIGURE_DPI
+        init_w = int(self.window_width  * self.FIGURE_WIDTH_PCT)
+        init_h = int(self.window_height * self.FIGURE_HEIGHT_PCT)
         self.fig, self.ax = plt.subplots(
-            figsize=(fig_w, fig_h),
+            figsize=(init_w / self.FIGURE_DPI, init_h / self.FIGURE_DPI),
             dpi=self.FIGURE_DPI,
         )
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
-        self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        widget = self.canvas.get_tk_widget()
+        cx = int(self.window_width  * self.FIGURE_CENTER_X)
+        cy = int(self.window_height * self.FIGURE_CENTER_Y)
+        widget.place(anchor='center', x=cx, y=cy, width=init_w, height=init_h)
+
+        # Reposition/resize figure whenever the window changes (including fullscreen)
+        self.root.bind("<Configure>", self._on_window_resize)
+
+    def _on_window_resize(self, event):
+        """Resize and reposition the matplotlib figure to track the window dimensions."""
+        if event.widget is not self.root:
+            return
+        canvas_w = int(event.width  * self.FIGURE_WIDTH_PCT)
+        canvas_h = int(event.height * self.FIGURE_HEIGHT_PCT)
+        if canvas_w < 1 or canvas_h < 1:
+            return
+        cx = int(event.width  * self.FIGURE_CENTER_X)
+        cy = int(event.height * self.FIGURE_CENTER_Y)
+        widget = self.canvas.get_tk_widget()
+        widget.place(anchor='center', x=cx, y=cy, width=canvas_w, height=canvas_h)
+        self.fig.set_size_inches(canvas_w / self.FIGURE_DPI, canvas_h / self.FIGURE_DPI)
+        self.canvas.draw_idle()
 
     def open_settings(self):
         """Open (or close) the spectrogram settings floating window."""
@@ -206,8 +237,15 @@ class SpectrogramApp:
                 self._apply_theme()
                 self.canvas.draw()
                 self._background = self.canvas.copy_from_bbox(self.ax.bbox)
+
+                if self.navigator is not None:
+                    self.navigator.reset(self.navigator.total_duration)
             except Exception as e:
                 messagebox.showerror("Settings Error", str(e))
+
+    def _on_view_change(self):
+        """Recache blit background after navigator redraws."""
+        self._background = self.canvas.copy_from_bbox(self.ax.bbox)
 
     def open_file(self, audio_path):
         """
@@ -254,6 +292,16 @@ class SpectrogramApp:
             self._background = self.canvas.copy_from_bbox(self.ax.bbox)
 
             self.toolbar.set_info_text(f"Loaded: {name} | sr={self.sr} Hz")
+
+            # Set up or reset the navigator
+            total_duration = len(self.audio_mono) / self.sr
+            if self.navigator is None:
+                self.navigator = SpectrogramNavigator(
+                    self.ax, self.canvas, total_duration,
+                    on_view_change=self._on_view_change,
+                )
+            else:
+                self.navigator.reset(total_duration)
 
         except Exception as e:
             messagebox.showerror("Error", str(e))
