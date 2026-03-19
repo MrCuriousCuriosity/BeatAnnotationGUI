@@ -60,8 +60,15 @@ class SpectrogramSettings:
         # Create floating window
         self.window = tk.Toplevel(parent)
         self.window.title("Spectrogram Settings")
-        self.window.geometry("400x500")
+        self.window.geometry("400x520")
         self.window.resizable(False, False)
+
+        # Enter button pinned to the bottom of the window
+        bottom_frame = ttk.Frame(self.window, padding=(15, 5, 15, 10))
+        bottom_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        ttk.Button(bottom_frame, text="Enter", command=self._on_apply).pack(
+            side=tk.RIGHT
+        )
 
         # Create main frame with padding
         main_frame = ttk.Frame(self.window, padding=15)
@@ -131,7 +138,7 @@ class SpectrogramSettings:
         win_len_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
 
         self.win_len_label = ttk.Label(win_len_frame, text=str(self.settings["win_len"]))
-        self.win_len_label.pack(side=tk.LEFT, width=8)
+        self.win_len_label.pack(side=tk.LEFT, padx=(5, 0))
 
         # === HOP LENGTH SECTION ===
         ttk.Label(main_frame, text="Hop Length (samples)", font=("Arial", 10, "bold")).pack(
@@ -153,7 +160,7 @@ class SpectrogramSettings:
         hop_len_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
 
         self.hop_len_label = ttk.Label(hop_len_frame, text=str(self.settings["hop_len"]))
-        self.hop_len_label.pack(side=tk.LEFT, width=8)
+        self.hop_len_label.pack(side=tk.LEFT, padx=(5, 0))
 
         # === DYNAMIC RANGE SECTION ===
         ttk.Label(main_frame, text="Dynamic Range (dB)", font=("Arial", 10, "bold")).pack(
@@ -175,7 +182,7 @@ class SpectrogramSettings:
         db_range_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
 
         self.db_range_label = ttk.Label(db_range_frame, text=str(self.settings["db_range"]))
-        self.db_range_label.pack(side=tk.LEFT, width=8)
+        self.db_range_label.pack(side=tk.LEFT, padx=(5, 0))
 
         # === NORMALIZE SECTION ===
         ttk.Label(main_frame, text="Display Options", font=("Arial", 10, "bold")).pack(
@@ -188,16 +195,7 @@ class SpectrogramSettings:
         )
         normalize_check.pack(anchor="w", pady=(0, 20))
 
-        # === BUTTON SECTION ===
-        button_frame = ttk.Frame(main_frame)
-        button_frame.pack(anchor="e", fill=tk.X, pady=(10, 0))
 
-        ttk.Button(button_frame, text="Reset", command=self._on_reset).pack(
-            side=tk.RIGHT, padx=(5, 0)
-        )
-        ttk.Button(button_frame, text="Apply", command=self._on_apply).pack(
-            side=tk.RIGHT, padx=(5, 0)
-        )
 
     def _on_win_len_change(self, value):
         """Update window length label."""

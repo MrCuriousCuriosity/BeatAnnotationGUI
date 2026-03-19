@@ -14,8 +14,6 @@ import importlib.util
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import sounddevice as sd
-
 import modusa as ms
 
 # Import custom modules with numeric prefixes
@@ -45,6 +43,11 @@ SpectrogramSettings = settings_module.SpectrogramSettings
 class SpectrogramApp:
     """Main application class for the Beat Annotation GUI."""
 
+    # === DARK/LIGHT MODE ===
+    DARK_MODE = True
+    
+
+
     # UI Layout positioning variables
     MAIN_WINDOW_WIDTH = 950
     MAIN_WINDOW_HEIGHT = 600
@@ -67,18 +70,12 @@ class SpectrogramApp:
         self.root.title("Audio Spectrogram Viewer")
         self.root.geometry(f"{self.MAIN_WINDOW_WIDTH}x{self.MAIN_WINDOW_HEIGHT}")
 
-        # Audio/playback state
+        # Audio state
         self.audio_mono = None
-        self.audio_for_playback = None
         self.sr = None
         self.audio_name = None
-        self.total_frames = 0
 
-        self.playhead_frame = 0
-        self.playing = False
-        self.stream = None
-
-        # Cursor line state
+        # Spectrogram line state
         self.playback_line = None
         self._background = None  # Cached spectrogram background for blitting
 
@@ -89,21 +86,54 @@ class SpectrogramApp:
         self._setup_toolbar()
         self._setup_canvas()
 
-        # Start UI update timer
-        self.root.after(SpectrogramConfig.UI_UPDATE_INTERVAL_MS, self._update_ui)
+        # Apply colour theme
+        self._apply_theme()
 
         # Clean shutdown
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+
+
+    # === DARK/LIGHT THEMES ===
+    _DARK_THEME = {
+        "bg": "#000000",
+        "fg": "#ffffff",
+    }
+    _LIGHT_THEME = {
+        "bg": "#f0f0f0",
+        "fg": "#000000",
+    }
+
+    def _apply_theme(self):
+        """Apply the light or dark colour theme to all tkinter and figure elements."""
+        theme = self._DARK_THEME if self.DARK_MODE else self._LIGHT_THEME
+        bg = theme["bg"]
+        fg = theme["fg"]
+
+        # Root window
+        self.root.configure(bg=bg)
+
+        # Matplotlib figure outer background
+        self.fig.patch.set_facecolor(bg)
+        self.ax.set_facecolor(bg)
+
+        # Axes spines, ticks, and labels
+        for spine in self.ax.spines.values():
+            spine.set_edgecolor(fg)
+        self.ax.tick_params(colors=fg)
+        self.ax.xaxis.label.set_color(fg)
+        self.ax.yaxis.label.set_color(fg)
+        self.ax.title.set_color(fg)
+    # === ===
+
 
     def _setup_toolbar(self):
         """Set up the top toolbar with callbacks."""
         callbacks = {
             "on_open": self.open_file,
-            "on_play": self.play_audio,
-            "on_pause": self.pause_audio,
             "on_settings": self.open_settings,
         }
         self.toolbar = TopToolBar(self.root, callbacks=callbacks)
+
 
     def _setup_canvas(self):
         """Set up the matplotlib canvas for spectrogram visualization."""
@@ -171,6 +201,7 @@ class SpectrogramApp:
                 self.playback_line = SpectrogramConfig.paint_spectrogram(
                     self.ax, S_db, freqs, times, self.audio_name
                 )
+                self._apply_theme()
                 self.canvas.draw()
                 self._background = self.canvas.copy_from_bbox(self.ax.bbox)
             except Exception as e:
@@ -200,19 +231,10 @@ class SpectrogramApp:
             self.audio_mono = np.asarray(y_mono, dtype=np.float32)
             self.sr = int(sr)
             self.audio_name = name
-            self.total_frames = self.audio_mono.shape[0]
-            self.playhead_frame = 0
 
-            # Prepare playback buffer as (frames, channels)
-            if y_raw.ndim == 2:
-                self.audio_for_playback = y_raw.T.astype(np.float32)  # (N, 2)
-            else:
-                self.audio_for_playback = y_raw.reshape(-1, 1).astype(
-                    np.float32
-                )  # (N, 1)
-
-            # Stop previous stream if any
-            self._stop_stream()
+            # Reset window/hop overrides so spectrogram uses current settings
+            SpectrogramConfig.WIN_LEN_SAMPLES = None
+            SpectrogramConfig.HOP_LEN_SAMPLES = None
 
             # Compute spectrogram
             S, freqs, times = SpectrogramConfig.compute_spectrogram(
@@ -225,6 +247,7 @@ class SpectrogramApp:
                 self.ax, S_db, freqs, times, name
             )
 
+            self._apply_theme()
             self.canvas.draw()
             self._background = self.canvas.copy_from_bbox(self.ax.bbox)
 
@@ -233,96 +256,8 @@ class SpectrogramApp:
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
-    def play_audio(self):
-        """Start audio playback."""
-        if self.audio_for_playback is None or self.sr is None:
-            messagebox.showinfo("No audio", "Load an audio file first.")
-            return
-
-        if self.playing:
-            return
-
-        # If finished, restart from beginning
-        if self.playhead_frame >= self.total_frames:
-            self.playhead_frame = 0
-
-        if self.stream is None:
-            channels = int(self.audio_for_playback.shape[1])
-
-            def callback(outdata, frames, time_info, status):
-                if status:
-                    pass
-
-                start = self.playhead_frame
-                end = min(start + frames, self.total_frames)
-                chunk = self.audio_for_playback[start:end]
-
-                n = end - start
-                outdata[:] = 0.0
-                if n > 0:
-                    outdata[:n, :channels] = chunk
-                    self.playhead_frame = end
-
-                # Reached end of file
-                if end >= self.total_frames:
-                    raise sd.CallbackStop()
-
-            self.stream = sd.OutputStream(
-                samplerate=self.sr,
-                channels=channels,
-                dtype="float32",
-                callback=callback,
-                finished_callback=self._on_stream_finished,
-            )
-
-        self.stream.start()
-        self.playing = True
-        self.toolbar.set_info_text(f"Playing: {self.audio_name}")
-
-    def pause_audio(self):
-        """Pause audio playback."""
-        if self.stream is not None and self.playing:
-            self.stream.stop()
-            self.playing = False
-            self.toolbar.set_info_text(
-                f"Paused: {self.audio_name} @ {self.playhead_frame / self.sr:.2f}s"
-            )
-
-    def _on_stream_finished(self):
-        """Handle stream finished callback."""
-        self.playing = False
-        self.stream = None
-        self.toolbar.set_info_text(f"Finished: {self.audio_name}")
-
-    def _stop_stream(self):
-        """Stop and clean up audio stream."""
-        self.playing = False
-        if self.stream is not None:
-            try:
-                self.stream.stop()
-            except Exception:
-                pass
-            try:
-                self.stream.close()
-            except Exception:
-                pass
-            self.stream = None
-
-    def _update_ui(self):
-        """Update UI elements (playback cursor position)."""
-        if self.playback_line is not None and self.sr and self.total_frames > 0 and self._background is not None:
-            t = self.playhead_frame / self.sr
-            self.playback_line.set_xdata([t, t])
-            # Blit: restore cached background, draw only the cursor, then blit
-            self.canvas.restore_region(self._background)
-            self.ax.draw_artist(self.playback_line)
-            self.canvas.blit(self.ax.bbox)
-
-        self.root.after(SpectrogramConfig.UI_UPDATE_INTERVAL_MS, self._update_ui)
-
     def on_close(self):
         """Handle window close event."""
-        self._stop_stream()
         self.root.destroy()
 
 

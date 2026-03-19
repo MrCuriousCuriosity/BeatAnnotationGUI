@@ -15,13 +15,11 @@ class TopToolBar:
     def __init__(self, parent_frame, callbacks=None):
         """Initialize the top toolbar."""
         self.frame = tk.Frame(parent_frame)
-        self.frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=10)
+        self.frame.pack(side=tk.TOP, fill=tk.X)
         self.callbacks = callbacks or {}
 
         # Setup UI elements
         self._setup_open_button()
-        self._setup_play_button()
-        self._setup_pause_button()
         self._setup_settings_button()
         self._setup_quit_button()
         self._setup_info_label()
@@ -51,31 +49,6 @@ class TopToolBar:
             except Exception as e:
                 messagebox.showerror("Error", str(e))
 
-    # === PLAY BUTTON ===
-    def _setup_play_button(self):
-        """Setup the Play button."""
-        self.play_btn = tk.Button(
-            self.frame, text="Play", command=self._on_play_click
-        )
-        self.play_btn.pack(side=tk.LEFT, padx=(8, 0))
-
-    def _on_play_click(self):
-        """Handle Play button click."""
-        if "on_play" in self.callbacks:
-            self.callbacks["on_play"]()
-
-    # === PAUSE BUTTON ===
-    def _setup_pause_button(self):
-        """Setup the Pause button."""
-        self.pause_btn = tk.Button(
-            self.frame, text="Pause", command=self._on_pause_click
-        )
-        self.pause_btn.pack(side=tk.LEFT, padx=(8, 0))
-
-    def _on_pause_click(self):
-        """Handle Pause button click."""
-        if "on_pause" in self.callbacks:
-            self.callbacks["on_pause"]()
 
     # === SPECTROGRAM SETTINGS BUTTON ===
     def _setup_settings_button(self):
