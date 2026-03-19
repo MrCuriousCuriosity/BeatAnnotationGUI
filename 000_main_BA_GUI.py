@@ -51,7 +51,7 @@ class SpectrogramApp:
     # UI Layout positioning variables
     MAIN_WINDOW_WIDTH = 950
     MAIN_WINDOW_HEIGHT = 600
-    FIGURE_WIDTH_PCT = 0.9   # fraction of MAIN_WINDOW_WIDTH
+    FIGURE_WIDTH_PCT = 1.0   # fraction of MAIN_WINDOW_WIDTH
     FIGURE_HEIGHT_PCT = 0.70  # fraction of MAIN_WINDOW_HEIGHT
     FIGURE_DPI = 100
     TOP_BAR_PADX = 10
