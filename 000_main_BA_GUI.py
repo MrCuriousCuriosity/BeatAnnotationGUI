@@ -51,8 +51,8 @@ class SpectrogramApp:
     # UI Layout positioning variables
     MAIN_WINDOW_WIDTH = 950
     MAIN_WINDOW_HEIGHT = 600
-    FIGURE_WIDTH_INCHES = 14
-    FIGURE_HEIGHT_INCHES = 5
+    FIGURE_WIDTH_PCT = 0.9   # fraction of MAIN_WINDOW_WIDTH
+    FIGURE_HEIGHT_PCT = 0.70  # fraction of MAIN_WINDOW_HEIGHT
     FIGURE_DPI = 100
     TOP_BAR_PADX = 10
     TOP_BAR_PADY = 10
@@ -137,8 +137,10 @@ class SpectrogramApp:
 
     def _setup_canvas(self):
         """Set up the matplotlib canvas for spectrogram visualization."""
+        fig_w = (self.MAIN_WINDOW_WIDTH * self.FIGURE_WIDTH_PCT) / self.FIGURE_DPI
+        fig_h = (self.MAIN_WINDOW_HEIGHT * self.FIGURE_HEIGHT_PCT) / self.FIGURE_DPI
         self.fig, self.ax = plt.subplots(
-            figsize=(self.FIGURE_WIDTH_INCHES, self.FIGURE_HEIGHT_INCHES),
+            figsize=(fig_w, fig_h),
             dpi=self.FIGURE_DPI,
         )
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
