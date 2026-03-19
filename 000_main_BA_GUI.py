@@ -47,19 +47,18 @@ class SpectrogramApp:
     # === DARK/LIGHT MODE ===
     DARK_MODE = True
 
+    SET_FULLSCREEN = True  # Set Fullscreen by default. I just added this for testing, and persnal preference.
+
     # === Main Window Layout ===
     MAIN_WINDOW_WIDTH_PCT  = 0.6  # Starting screen width
     MAIN_WINDOW_HEIGHT_PCT = 0.4  # Starting screen height
 
     # === Spectrogram Plot Layout ===
     FIGURE_WIDTH_PCT  = 1.2
-    FIGURE_HEIGHT_PCT = 0.50
+    FIGURE_HEIGHT_PCT = 0.70
     FIGURE_CENTER_X   = 0.5
-    FIGURE_CENTER_Y   = 0.3
+    FIGURE_CENTER_Y   = 0.35
     FIGURE_DPI = 100
-
-    TOP_BAR_PADX = 10
-    TOP_BAR_PADY = 10
 
     def __init__(self, root):
         """
@@ -79,6 +78,10 @@ class SpectrogramApp:
         self.window_width  = int(screen_w * self.MAIN_WINDOW_WIDTH_PCT)
         self.window_height = int(screen_h * self.MAIN_WINDOW_HEIGHT_PCT)
         self.root.geometry(f"{self.window_width}x{self.window_height}")
+
+        # === SET_FULLSCREEN on startup funtion ===
+        if self.SET_FULLSCREEN:
+            self.root.attributes("-fullscreen", True)
 
         # Audio state
         self.audio_mono = None

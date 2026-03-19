@@ -12,10 +12,13 @@ import modusa as ms
 # === Script for Main ToolBar (TOP) ===
 
 class TopToolBar:
+    TOOLBAR_HEIGHT = 40  # Height in pixels of the toolbar background frame
+
     def __init__(self, parent_frame, callbacks=None):
         """Initialize the top toolbar."""
-        self.frame = tk.Frame(parent_frame)
-        self.frame.pack(side=tk.TOP, fill=tk.X)
+        self.frame = tk.Frame(parent_frame, height=self.TOOLBAR_HEIGHT)
+        self.frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 0))
+        self.frame.pack_propagate(False)
         self.callbacks = callbacks or {}
 
         # Setup UI elements
