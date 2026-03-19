@@ -239,15 +239,18 @@ class SpectrogramNavigator:
         if event.inaxes is not self.ax or event.button != 1 or event.xdata is None:
             return
         self._drag_anchor = event.xdata
+        # Hide image at drag start for fast axis updates during pan
+        if self.ax.images:
+            self.ax.images[0].set_visible(False)
 
     def _on_motion(self, event):
         if self._drag_anchor is None or event.xdata is None:
             return
 
-        # Shift window so the anchor data-point stays under the cursor
-        delta = self._drag_anchor - event.xdata
+        # Drag right → earlier in time (inverted: delta flipped)
+        delta = event.xdata - self._drag_anchor
         span = self.view_end - self.view_start
-        new_start = self.view_start + delta
+        new_start = self.view_start - delta
         new_end = new_start + span
 
         if new_start < 0.0:
@@ -259,11 +262,20 @@ class SpectrogramNavigator:
 
         self.view_start = new_start
         self.view_end = new_end
-        self._apply_view()
+        self._drag_anchor = event.xdata
+        self.ax.set_xlim(self.view_start, self.view_end)
+        self.canvas.draw()
 
     def _on_release(self, event):
-        if event.button == 1:
-            self._drag_anchor = None
+        if event.button != 1:
+            return
+        self._drag_anchor = None
+        # Restore image and do full render on release
+        if self.ax.images:
+            self.ax.images[0].set_visible(True)
+        self.canvas.draw()
+        if self.on_view_change:
+            self.on_view_change()
 
     # --- Redraw -------------------------------------------------------
 
@@ -295,15 +307,4 @@ class SpectrogramNavigator:
         if self.on_view_change:
             self.on_view_change()
 
-    def _apply_view(self):
-        """Full immediate redraw — used by pan drag."""
-        # If a scroll session left the image hidden, restore it and cancel timer
-        if self.ax.images and not self.ax.images[0].get_visible():
-            self.ax.images[0].set_visible(True)
-            if self._redraw_after_id is not None:
-                self.canvas.get_tk_widget().after_cancel(self._redraw_after_id)
-                self._redraw_after_id = None
-        self.ax.set_xlim(self.view_start, self.view_end)
-        self.canvas.draw()
-        if self.on_view_change:
-            self.on_view_change()
+
