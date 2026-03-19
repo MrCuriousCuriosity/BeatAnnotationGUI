@@ -14,7 +14,7 @@ import importlib.util
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import modusa as ms
+import modusa
 
 # Import custom modules with numeric prefixes
 current_dir = Path(__file__).parent
@@ -262,7 +262,7 @@ class SpectrogramApp:
             Path to the audio file.
         """
         try:
-            y, sr, name = ms.load.audio(audio_path)
+            y, sr, name = modusa.load.audio(audio_path)
 
             # Keep original for playback shape handling
             y_raw = np.asarray(y, dtype=np.float32)
