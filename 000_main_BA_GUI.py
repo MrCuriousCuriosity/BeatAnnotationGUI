@@ -205,6 +205,7 @@ class SpectrogramApp:
             "hop_len": hop_len,
             "db_range": SpectrogramConfig.DB_RANGE,
             "normalize": SpectrogramConfig.NORMALIZE,
+            "render_cols": SpectrogramConfig.RENDER_COLS,
         }
 
         self._settings_window = SpectrogramSettings(
@@ -222,6 +223,7 @@ class SpectrogramApp:
         SpectrogramConfig.HOP_LEN_SAMPLES = settings["hop_len"]
         SpectrogramConfig.DB_RANGE = settings["db_range"]
         SpectrogramConfig.NORMALIZE = settings["normalize"]
+        SpectrogramConfig.RENDER_COLS = settings["render_cols"]
         self._settings_window = None
 
         # Recompute and repaint if audio is loaded

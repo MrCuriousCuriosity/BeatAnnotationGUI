@@ -25,7 +25,10 @@ class SpectrogramConfig:
     MAX_FREQ = 8000         # Max frequency for display (Hz)
     DB_RANGE = 80           # Dynamic range in dB
     NORMALIZE = True        # Normalize display to signal peak
-    
+
+    # === Render resolution ===
+    RENDER_COLS = 4096      # Time columns in the pre-downsampled display image
+
     # === Playback cursor parameters ===
     PLAYBACK_LINE_COLOR = "white"
     PLAYBACK_LINE_WIDTH = 1.0
@@ -89,6 +92,29 @@ class SpectrogramConfig:
         return 20 * np.log10(np.abs(S) + 1e-8)
 
     @staticmethod
+    def downsample_spectrogram(S_db, target_cols):
+        """
+        Reduce S_db to target_cols time columns via block-max pooling.
+
+        Parameters
+        ----------
+        S_db : np.ndarray
+            Full-resolution spectrogram in dB, shape (n_freq, n_time).
+        target_cols : int
+            Desired number of output time columns.
+
+        Returns
+        -------
+        np.ndarray
+            Downsampled spectrogram, shape (n_freq, target_cols).
+        """
+        n_freq, n_time = S_db.shape
+        if n_time <= target_cols:
+            return S_db
+        indices = np.linspace(0, n_time, target_cols + 1, dtype=int)
+        return np.maximum.reduceat(S_db, indices[:-1], axis=1)
+
+    @staticmethod
     def paint_spectrogram(ax, S_db, freqs, times, name):
         """
         Paint spectrogram on matplotlib axes.
@@ -112,16 +138,24 @@ class SpectrogramConfig:
             The playback cursor line object.
         """
         ax.clear()
+        S_db_render = SpectrogramConfig.downsample_spectrogram(
+            S_db, SpectrogramConfig.RENDER_COLS
+        )
+        times_render = (
+            np.linspace(times[0], times[-1], S_db_render.shape[1])
+            if S_db_render.shape[1] != len(times)
+            else times
+        )
         modusa.paint.image(
             ax=ax,
-            M=S_db,
+            M=S_db_render,
             y=freqs,
-            x=times,
+            x=times_render,
             c=SpectrogramConfig.COLOR_SCHEME,
             o=SpectrogramConfig.ORIGIN,
         )
 
-        # Apply dynamic range and normalization
+        # Apply dynamic range and normalization (use original S_db for global max)
         if ax.images:
             vmax = float(S_db.max()) if SpectrogramConfig.NORMALIZE else 0.0
             vmin = vmax - SpectrogramConfig.DB_RANGE
@@ -173,8 +207,6 @@ class SpectrogramNavigator:
         if self._redraw_after_id is not None:
             self.canvas.get_tk_widget().after_cancel(self._redraw_after_id)
             self._redraw_after_id = None
-        if self.ax.images:
-            self.ax.images[0].set_visible(True)
         self.total_duration = total_duration
         self.view_start = 0.0
         self.view_end = total_duration
@@ -239,9 +271,6 @@ class SpectrogramNavigator:
         if event.inaxes is not self.ax or event.button != 1 or event.xdata is None:
             return
         self._drag_anchor = event.xdata
-        # Hide image at drag start for fast axis updates during pan
-        if self.ax.images:
-            self.ax.images[0].set_visible(False)
 
     def _on_motion(self, event):
         if self._drag_anchor is None or event.xdata is None:
@@ -270,9 +299,6 @@ class SpectrogramNavigator:
         if event.button != 1:
             return
         self._drag_anchor = None
-        # Restore image and do full render on release
-        if self.ax.images:
-            self.ax.images[0].set_visible(True)
         self.canvas.draw()
         if self.on_view_change:
             self.on_view_change()
@@ -280,30 +306,25 @@ class SpectrogramNavigator:
     # --- Redraw -------------------------------------------------------
 
     def _apply_view_scroll(self):
-        """Scroll path: hide the image so canvas.draw() only redraws axes/ticks
-        (fast), giving real-time time-axis updates. Debounce the full image render."""
+        """Scroll path: update xlim and render immediately (image is pre-downsampled
+        so draws are fast), then debounce the blit-background recache."""
         self.ax.set_xlim(self.view_start, self.view_end)
-        # Hide image → draw() becomes cheap → ticks repaint immediately
-        if self.ax.images:
-            self.ax.images[0].set_visible(False)
         self.canvas.draw()
-        self._schedule_full_redraw()
+        self._schedule_blit_recache()
 
-    def _schedule_full_redraw(self):
-        """Cancel any pending redraw timer and start a new one."""
+    def _schedule_blit_recache(self):
+        """Debounce the on_view_change callback to recache blit background
+        once per scroll session rather than on every tick."""
         widget = self.canvas.get_tk_widget()
         if self._redraw_after_id is not None:
             widget.after_cancel(self._redraw_after_id)
         self._redraw_after_id = widget.after(
-            self.SCROLL_DEBOUNCE_MS, self._do_full_redraw
+            self.SCROLL_DEBOUNCE_MS, self._do_blit_recache
         )
 
-    def _do_full_redraw(self):
-        """Restore image and do the expensive full render after debounce."""
+    def _do_blit_recache(self):
+        """Recache the blit background after scroll ends."""
         self._redraw_after_id = None
-        if self.ax.images:
-            self.ax.images[0].set_visible(True)
-        self.canvas.draw()
         if self.on_view_change:
             self.on_view_change()
 

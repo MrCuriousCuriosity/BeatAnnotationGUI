@@ -40,6 +40,7 @@ class SpectrogramSettings:
         "hop_len": 512,
         "db_range": 60,
         "normalize": True,
+        "render_cols": 4096,
     }
 
     def __init__(self, parent, settings=None, on_apply_callback=None):
@@ -60,7 +61,7 @@ class SpectrogramSettings:
         # Create floating window
         self.window = tk.Toplevel(parent)
         self.window.title("Spectrogram Settings")
-        self.window.geometry("400x520")
+        self.window.geometry("400x600")
         self.window.resizable(False, False)
 
         # Enter button pinned to the bottom of the window
@@ -193,9 +194,35 @@ class SpectrogramSettings:
         normalize_check = ttk.Checkbutton(
             main_frame, text="Normalize spectrogram", variable=self.normalize_var
         )
-        normalize_check.pack(anchor="w", pady=(0, 20))
+        normalize_check.pack(anchor="w", pady=(0, 15))
+
+        # === RENDER RESOLUTION SECTION ===
+        ttk.Label(main_frame, text="Render Resolution (columns)", font=("Arial", 10, "bold")).pack(
+            anchor="w", pady=(0, 5)
+        )
+
+        render_cols_frame = ttk.Frame(main_frame)
+        render_cols_frame.pack(anchor="w", pady=(0, 15), fill=tk.X)
+
+        self.render_cols_var = tk.IntVar(value=self.settings.get("render_cols", 4096))
+        render_cols_scale = ttk.Scale(
+            render_cols_frame,
+            from_=512,
+            to=8192,
+            orient=tk.HORIZONTAL,
+            variable=self.render_cols_var,
+            command=self._on_render_cols_change,
+        )
+        render_cols_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
+
+        self.render_cols_label = ttk.Label(render_cols_frame, text=str(self.settings.get("render_cols", 4096)))
+        self.render_cols_label.pack(side=tk.LEFT, padx=(5, 0))
 
 
+
+    def _on_render_cols_change(self, value):
+        """Update render resolution label."""
+        self.render_cols_label.config(text=str(int(float(value))))
 
     def _on_win_len_change(self, value):
         """Update window length label."""
@@ -219,6 +246,7 @@ class SpectrogramSettings:
             "hop_len": int(self.hop_len_var.get()),
             "db_range": int(self.db_range_var.get()),
             "normalize": self.normalize_var.get(),
+            "render_cols": int(self.render_cols_var.get()),
         }
 
         if self.on_apply_callback:
@@ -235,11 +263,13 @@ class SpectrogramSettings:
         self.hop_len_var.set(self.DEFAULTS["hop_len"])
         self.db_range_var.set(self.DEFAULTS["db_range"])
         self.normalize_var.set(self.DEFAULTS["normalize"])
+        self.render_cols_var.set(self.DEFAULTS["render_cols"])
 
         # Update labels
         self.win_len_label.config(text=str(self.DEFAULTS["win_len"]))
         self.hop_len_label.config(text=str(self.DEFAULTS["hop_len"]))
         self.db_range_label.config(text=str(self.DEFAULTS["db_range"]))
+        self.render_cols_label.config(text=str(self.DEFAULTS["render_cols"]))
 
     def get_settings(self):
         """Return current settings dict."""
