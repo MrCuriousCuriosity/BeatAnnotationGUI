@@ -40,6 +40,20 @@ settings_module = importlib.util.module_from_spec(spec_settings)
 spec_settings.loader.exec_module(settings_module)
 SpectrogramSettings = settings_module.SpectrogramSettings
 
+spec_playback = importlib.util.spec_from_file_location(
+    "sound_playback", current_dir / "100_SoundPlayback.py"
+)
+playback_module = importlib.util.module_from_spec(spec_playback)
+spec_playback.loader.exec_module(playback_module)
+AudioPlayer = playback_module.AudioPlayer
+
+spec_cursor = importlib.util.spec_from_file_location(
+    "playback_cursor", current_dir / "101_PlayBackCursor.py"
+)
+cursor_module = importlib.util.module_from_spec(spec_cursor)
+spec_cursor.loader.exec_module(cursor_module)
+PlaybackCursor = cursor_module.PlaybackCursor
+
 
 class SpectrogramApp:
     """Main application class for the Beat Annotation GUI."""
@@ -88,9 +102,8 @@ class SpectrogramApp:
         self.sr = None
         self.audio_name = None
 
-        # Spectrogram line state
-        self.playback_line = None
-        self._background = None  # Cached spectrogram background for blitting
+        # Spectrogram background cache for blitting
+        self._background = None
 
         # Settings window state
         self._settings_window = None
@@ -98,12 +111,22 @@ class SpectrogramApp:
         # Navigator state
         self.navigator = None
 
+        # Playback engine and cursor
+        self.player = AudioPlayer()
+        self.playback_cursor = None
+
+        # UI update loop handle
+        self._loop_id = None
+
         # Create UI components (canvas first, toolbar on top)
         self._setup_canvas()
         self._setup_toolbar()
 
         # Apply colour theme
         self._apply_theme()
+
+        # Start the ~60 FPS cursor update loop
+        self._start_update_loop()
 
         # Clean shutdown
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -143,8 +166,11 @@ class SpectrogramApp:
     def _setup_toolbar(self):
         """Set up the top toolbar with callbacks."""
         callbacks = {
-            "on_open": self.open_file,
+            "on_open":     self.open_file,
             "on_settings": self.open_settings,
+            "on_play":     self._on_play,
+            "on_pause":    self._on_pause,
+            "on_stop":     self._on_stop,
         }
         self.toolbar = TopToolBar(self.root, callbacks=callbacks)
 
@@ -236,12 +262,15 @@ class SpectrogramApp:
                     self.audio_mono, self.sr
                 )
                 S_db = SpectrogramConfig.get_spectrogram_db(S)
-                self.playback_line = SpectrogramConfig.paint_spectrogram(
+                SpectrogramConfig.paint_spectrogram(
                     self.ax, S_db, freqs, times, self.audio_name
                 )
                 self._apply_theme()
                 self.canvas.draw()
                 self._background = self.canvas.copy_from_bbox(self.ax.bbox)
+
+                # Recreate cursor on the redrawn axes
+                self.playback_cursor = PlaybackCursor(self.ax)
 
                 if self.navigator is not None:
                     self.navigator.reset(self.navigator.total_duration)
@@ -251,6 +280,9 @@ class SpectrogramApp:
     def _on_view_change(self):
         """Recache blit background after navigator redraws."""
         self._background = self.canvas.copy_from_bbox(self.ax.bbox)
+        # Redraw cursor immediately so it remains visible after the recache
+        if self.playback_cursor is not None:
+            self.playback_cursor.draw(self.canvas, self._background)
 
     def open_file(self, audio_path):
         """
@@ -288,13 +320,19 @@ class SpectrogramApp:
             S_db = SpectrogramConfig.get_spectrogram_db(S)
 
             # Paint spectrogram
-            self.playback_line = SpectrogramConfig.paint_spectrogram(
+            SpectrogramConfig.paint_spectrogram(
                 self.ax, S_db, freqs, times, name
             )
 
             self._apply_theme()
             self.canvas.draw()
             self._background = self.canvas.copy_from_bbox(self.ax.bbox)
+
+            # (Re)create the playback cursor on the freshly drawn axes
+            self.playback_cursor = PlaybackCursor(self.ax)
+
+            # Load audio into the player (resets position to 0)
+            self.player.load(self.audio_mono, self.sr)
 
             self.toolbar.set_info_text(f"Loaded: {name} | sr={self.sr} Hz")
 
@@ -311,8 +349,50 @@ class SpectrogramApp:
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
+    # === Playback controls ============================================
+
+    def _on_play(self):
+        """Play or resume audio."""
+        if self.player.is_playing:
+            self.player.pause()
+        else:
+            self.player.resume() if self.player.playback_position_sec > 0.0 else self.player.play()
+
+    def _on_pause(self):
+        """Pause audio without resetting position."""
+        self.player.pause()
+
+    def _on_stop(self):
+        """Stop audio and reset cursor to 0."""
+        self.player.stop()
+        # Draw cursor at 0 immediately
+        if self.playback_cursor is not None:
+            self.playback_cursor.update(0.0)
+            self.playback_cursor.draw(self.canvas, self._background)
+
+    # === ~60 FPS cursor update loop ===================================
+
+    def _start_update_loop(self):
+        """Start the recurring UI update loop."""
+        self._loop_tick()
+
+    def _loop_tick(self):
+        """Single tick: advance player position and redraw cursor."""
+        self.player.update_position()
+        if self.playback_cursor is not None and self._background is not None:
+            self.playback_cursor.update(self.player.playback_position_sec)
+            self.playback_cursor.draw(self.canvas, self._background)
+        self._loop_id = self.root.after(
+            SpectrogramConfig.UI_UPDATE_INTERVAL_MS, self._loop_tick
+        )
+
+    # ==================================================================
+
     def on_close(self):
         """Handle window close event."""
+        self.player.stop()
+        if self._loop_id is not None:
+            self.root.after_cancel(self._loop_id)
         self.root.destroy()
 
 

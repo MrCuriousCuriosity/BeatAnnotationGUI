@@ -132,10 +132,6 @@ class SpectrogramConfig:
         name : str
             Audio file name (for title).
 
-        Returns
-        -------
-        playback_line : matplotlib.lines.Line2D
-            The playback cursor line object.
         """
         ax.clear()
         S_db_render = SpectrogramConfig.downsample_spectrogram(
@@ -166,25 +162,12 @@ class SpectrogramConfig:
         ax.set_title(f"Spectrogram: {name}")
         ax.set_ylim(SpectrogramConfig.MIN_FREQ, SpectrogramConfig.MAX_FREQ)
 
-        # === Add playback cursor line ===
-        playback_line = ax.axvline(
-            x=0.0,
-            color=SpectrogramConfig.PLAYBACK_LINE_COLOR,
-            linewidth=SpectrogramConfig.PLAYBACK_LINE_WIDTH,
-            alpha=SpectrogramConfig.PLAYBACK_LINE_ALPHA,
-            zorder=SpectrogramConfig.PLAYBACK_LINE_ZORDER,
-            animated=True,  # Exclude from static draw; updated via blit
-        )
-
-        return playback_line
-
 
 class SpectrogramNavigator:
     """Handles scroll-to-zoom and click+drag pan on the spectrogram axes."""
 
     ZOOM_FACTOR = 0.7       # Window shrinks to 70% per scroll-down step
     MIN_WINDOW_SEC = 0.1    # Minimum displayable time window (seconds)
-    SCROLL_DEBOUNCE_MS = 300  # Full redraw fires this long after the last scroll tick
 
     def __init__(self, ax, canvas, total_duration, on_view_change=None):
         self.ax = ax
@@ -195,7 +178,6 @@ class SpectrogramNavigator:
         self.view_start = 0.0
         self.view_end = total_duration
         self._drag_anchor = None
-        self._redraw_after_id = None
         self._cids = []
 
         self._bind_events()
@@ -204,9 +186,6 @@ class SpectrogramNavigator:
 
     def reset(self, total_duration):
         """Reset view to full duration. Call when a new file is loaded."""
-        if self._redraw_after_id is not None:
-            self.canvas.get_tk_widget().after_cancel(self._redraw_after_id)
-            self._redraw_after_id = None
         self.total_duration = total_duration
         self.view_start = 0.0
         self.view_end = total_duration
@@ -306,26 +285,13 @@ class SpectrogramNavigator:
     # --- Redraw -------------------------------------------------------
 
     def _apply_view_scroll(self):
-        """Scroll path: update xlim and render immediately (image is pre-downsampled
-        so draws are fast), then debounce the blit-background recache."""
+        """Scroll path: update xlim, render, and immediately recache the blit
+        background so the cursor update loop doesn't restore the stale frame."""
         self.ax.set_xlim(self.view_start, self.view_end)
         self.canvas.draw()
-        self._schedule_blit_recache()
-
-    def _schedule_blit_recache(self):
-        """Debounce the on_view_change callback to recache blit background
-        once per scroll session rather than on every tick."""
-        widget = self.canvas.get_tk_widget()
-        if self._redraw_after_id is not None:
-            widget.after_cancel(self._redraw_after_id)
-        self._redraw_after_id = widget.after(
-            self.SCROLL_DEBOUNCE_MS, self._do_blit_recache
-        )
-
-    def _do_blit_recache(self):
-        """Recache the blit background after scroll ends."""
-        self._redraw_after_id = None
         if self.on_view_change:
             self.on_view_change()
+
+
 
 

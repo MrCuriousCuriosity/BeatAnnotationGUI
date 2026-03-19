@@ -7,12 +7,10 @@ This module handles the top toolbar section with file operations and playback co
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-import modusa as ms
-
 # === Script for Main ToolBar (TOP) ===
 
 class TopToolBar:
-    TOOLBAR_HEIGHT = 40  # Height in pixels of the toolbar background frame
+    TOOLBAR_HEIGHT = 40  # Height of the toolbar frame
 
     def __init__(self, parent_frame, callbacks=None):
         """Initialize the top toolbar."""
@@ -24,6 +22,7 @@ class TopToolBar:
         # Setup UI elements
         self._setup_open_button()
         self._setup_settings_button()
+        self._setup_playback_buttons()
         self._setup_quit_button()
         self._setup_info_label()
 
@@ -65,6 +64,36 @@ class TopToolBar:
         """Handle Settings button click."""
         if "on_settings" in self.callbacks:
             self.callbacks["on_settings"]()
+
+    # === PLAYBACK BUTTONS ===
+    def _setup_playback_buttons(self):
+        """Setup Play, Pause, and Stop buttons."""
+        self.play_btn = tk.Button(
+            self.frame, text="▶ Play", command=self._on_play_click
+        )
+        self.play_btn.pack(side=tk.LEFT, padx=(8, 0))
+
+        self.pause_btn = tk.Button(
+            self.frame, text="⏸ Pause", command=self._on_pause_click
+        )
+        self.pause_btn.pack(side=tk.LEFT, padx=(4, 0))
+
+        self.stop_btn = tk.Button(
+            self.frame, text="⏹ Stop", command=self._on_stop_click
+        )
+        self.stop_btn.pack(side=tk.LEFT, padx=(4, 0))
+
+    def _on_play_click(self):
+        if "on_play" in self.callbacks:
+            self.callbacks["on_play"]()
+
+    def _on_pause_click(self):
+        if "on_pause" in self.callbacks:
+            self.callbacks["on_pause"]()
+
+    def _on_stop_click(self):
+        if "on_stop" in self.callbacks:
+            self.callbacks["on_stop"]()
 
     # === INFO LABEL ===
     def _setup_info_label(self):
