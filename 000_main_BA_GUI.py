@@ -284,6 +284,10 @@ class SpectrogramApp:
         if self.playback_cursor is not None:
             self.playback_cursor.draw(self.canvas, self._background)
 
+    def _on_nav_start(self):
+        """Pause cursor blitting while the user is actively panning/zooming."""
+        self._background = None
+
     def open_file(self, audio_path):
         """
         Load an audio file and display its spectrogram.
@@ -342,6 +346,7 @@ class SpectrogramApp:
                 self.navigator = SpectrogramNavigator(
                     self.ax, self.canvas, total_duration,
                     on_view_change=self._on_view_change,
+                    on_nav_start=self._on_nav_start,
                 )
             else:
                 self.navigator.reset(total_duration)

@@ -7,6 +7,11 @@ This module handles the top toolbar section with file operations and playback co
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
+
+# Optional hardcoded audio path used by the Open button.
+HARDCODED_AUDIO_PATH = "Chopin Nocturne, op 27 no 2 - Maria João Pires live at Jardin Musical"
+
+
 # === Script for Main ToolBar (TOP) ===
 
 class TopToolBar:
@@ -36,13 +41,15 @@ class TopToolBar:
 
     def _on_open_click(self):
         """Handle Open button click."""
-        audio_path = filedialog.askopenfilename(
-            title="Choose audio file",
-            filetypes=[
-                ("Audio files", "*.wav *.mp3 *.flac *.m4a *.aac *.opus *.aiff"),
-                ("All files", "*.*"),
-            ],
-        )
+        audio_path = HARDCODED_AUDIO_PATH
+        if not audio_path:
+            audio_path = filedialog.askopenfilename(
+                title="Choose audio file",
+                filetypes=[
+                    ("Audio files", "*.wav *.mp3 *.flac *.m4a *.aac *.opus *.aiff"),
+                    ("All files", "*.*"),
+                ],
+            )
         if not audio_path:
             return
         if "on_open" in self.callbacks:

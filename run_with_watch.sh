@@ -12,4 +12,4 @@
     # Avoids multiple restarts if multiple files are changed at once 
     # A ideia é evitar que ele compile quando o codigo ta incompleto. Mas ainda n testei se funciona.
 
-watchmedo auto-restart --patterns="*.py" --recursive --debounce=1 -- python 000_main_BA_GUI.py
+watchmedo auto-restart --patterns="*.py" --recursive --debounce=1 -- python 001_STARTUP_PATH.py

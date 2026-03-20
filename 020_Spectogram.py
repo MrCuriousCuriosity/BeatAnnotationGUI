@@ -164,23 +164,41 @@ class SpectrogramConfig:
 
 
 class SpectrogramNavigator:
-    """Handles scroll-to-zoom and click+drag pan on the spectrogram axes."""
+    """Handles scroll-to-zoom and click+drag pan on the spectrogram axes.
+
+    Interaction model:
+    - While dragging/scrolling: only the x-axis is blitted (fast preview).
+    - After interaction settles: one full canvas redraw is performed.
+    """
 
     ZOOM_FACTOR = 0.7       # Window shrinks to 70% per scroll-down step
     MIN_WINDOW_SEC = 0.1    # Minimum displayable time window (seconds)
+    PREVIEW_INTERVAL_MS = 16  # 60 Hz axis preview while interacting
+    SCROLL_SETTLE_MS = 200  # Redraw spectrogram 0.2 s after last wheel event
 
-    def __init__(self, ax, canvas, total_duration, on_view_change=None):
+    def __init__(self, ax, canvas, total_duration, on_view_change=None, on_nav_start=None):
         self.ax = ax
         self.canvas = canvas
         self.total_duration = total_duration
-        self.on_view_change = on_view_change  # called after every redraw
+        self.on_view_change = on_view_change  # called after every full redraw
+        self.on_nav_start = on_nav_start      # called when interaction begins
 
         self.view_start = 0.0
         self.view_end = total_duration
         self._drag_anchor = None
+        self._drag_anchor_px = None
+        self._drag_view_start = None
+        self._drag_span = None
+        self._scroll_after_id = None
+        self._preview_after_id = None
+        self._preview_dirty = False
+        self._axis_preview_background = None
+        self._axis_preview_bbox = None
+        self._nav_active = False
         self._cids = []
 
         self._bind_events()
+        self._cache_axis_preview_background_from_current()
 
     # --- Public API ---------------------------------------------------
 
@@ -189,13 +207,28 @@ class SpectrogramNavigator:
         self.total_duration = total_duration
         self.view_start = 0.0
         self.view_end = total_duration
+        self._drag_anchor = None
+        self._drag_anchor_px = None
+        self._drag_view_start = None
+        self._drag_span = None
+        self._nav_active = False
+        self._stop_preview_loop()
+        self._cancel_scroll_settle()
         self.ax.set_xlim(self.view_start, self.view_end)
+        self._cache_axis_preview_background_from_current()
 
     def unbind_events(self):
         """Disconnect all matplotlib event handlers."""
         for cid in self._cids:
             self.canvas.mpl_disconnect(cid)
         self._cids.clear()
+        self._drag_anchor = None
+        self._drag_anchor_px = None
+        self._drag_view_start = None
+        self._drag_span = None
+        self._nav_active = False
+        self._stop_preview_loop()
+        self._cancel_scroll_settle()
 
     # --- Setup --------------------------------------------------------
 
@@ -207,11 +240,104 @@ class SpectrogramNavigator:
             self.canvas.mpl_connect('button_release_event',  self._on_release),
         ]
 
+    # --- Internal helpers ---------------------------------------------
+
+    def _cancel_scroll_settle(self):
+        if self._scroll_after_id is not None:
+            self.canvas.get_tk_widget().after_cancel(self._scroll_after_id)
+            self._scroll_after_id = None
+
+    def _begin_navigation(self):
+        """Enter interaction mode and pause external cursor blitting."""
+        if self._nav_active:
+            return
+        self._nav_active = True
+        self._start_preview_loop()
+        if self.on_nav_start:
+            self.on_nav_start()
+        if self._axis_preview_background is None:
+            self._cache_axis_preview_background_from_current()
+
+    def _finish_navigation(self):
+        """Render one final frame and refresh preview cache for next interaction."""
+        self._nav_active = False
+        self._stop_preview_loop()
+        self.ax.set_xlim(self.view_start, self.view_end)
+        self.canvas.draw()
+        if self.on_view_change:
+            self.on_view_change()
+        self._cache_axis_preview_background_from_current()
+
+    def _start_preview_loop(self):
+        if self._preview_after_id is not None:
+            return
+        self._preview_after_id = self.canvas.get_tk_widget().after(
+            self.PREVIEW_INTERVAL_MS, self._preview_tick
+        )
+
+    def _stop_preview_loop(self):
+        if self._preview_after_id is not None:
+            self.canvas.get_tk_widget().after_cancel(self._preview_after_id)
+            self._preview_after_id = None
+        self._preview_dirty = False
+
+    def _request_preview_draw(self):
+        self._preview_dirty = True
+
+    def _preview_tick(self):
+        self._preview_after_id = None
+        if not self._nav_active:
+            return
+
+        if self._preview_dirty:
+            self._preview_dirty = False
+            self.ax.set_xlim(self.view_start, self.view_end)
+            self._draw_axis_preview()
+
+        self._preview_after_id = self.canvas.get_tk_widget().after(
+            self.PREVIEW_INTERVAL_MS, self._preview_tick
+        )
+
+    def _draw_axis_preview(self):
+        """Fast path: draw only x-axis on top of frozen spectrogram pixels."""
+        if self._axis_preview_background is None or self._axis_preview_bbox is None:
+            return
+        self.canvas.restore_region(self._axis_preview_background)
+        self.ax.draw_artist(self.ax.xaxis)
+        self.canvas.blit(self._axis_preview_bbox)
+
+    def _cache_axis_preview_background_from_current(self):
+        """Cache axes pixels with x-axis hidden for fast x-axis-only previews."""
+        try:
+            fig_bbox = self.canvas.figure.bbox
+            full_bg = self.canvas.copy_from_bbox(fig_bbox)
+
+            renderer = self.canvas.get_renderer()
+            self._axis_preview_bbox = self.ax.get_tightbbox(renderer)
+            if self._axis_preview_bbox is None:
+                self._axis_preview_bbox = self.ax.bbox
+
+            xaxis_visible = self.ax.xaxis.get_visible()
+            self.ax.xaxis.set_visible(False)
+            self.canvas.draw()
+            self._axis_preview_background = self.canvas.copy_from_bbox(self._axis_preview_bbox)
+            self.ax.xaxis.set_visible(xaxis_visible)
+
+            # Restore the full frame without another full draw.
+            self.canvas.restore_region(full_bg)
+            self.canvas.blit(fig_bbox)
+        except Exception:
+            # If renderer state is not ready yet, keep preview disabled.
+            self._axis_preview_background = None
+            self._axis_preview_bbox = None
+
     # --- Scroll-to-zoom -----------------------------------------------
 
     def _on_scroll(self, event):
         if event.inaxes is not self.ax or event.xdata is None:
             return
+
+        self._begin_navigation()
 
         zoom_in = event.step < 0
         t_mouse = max(self.view_start, min(self.view_end, event.xdata))
@@ -222,10 +348,7 @@ class SpectrogramNavigator:
         else:
             new_span = current_span / self.ZOOM_FACTOR
             if new_span >= self.total_duration:
-                self.view_start = 0.0
-                self.view_end = self.total_duration
-                self._apply_view_scroll()
-                return
+                new_span = self.total_duration
 
         # Keep the time point under the cursor fixed
         ratio = (t_mouse - self.view_start) / current_span if current_span > 0 else 0.5
@@ -242,23 +365,43 @@ class SpectrogramNavigator:
 
         self.view_start = new_start
         self.view_end = new_end
-        self._apply_view_scroll()
+
+        # Defer axis drawing to the 60 Hz preview loop.
+        self._request_preview_draw()
+
+        self._cancel_scroll_settle()
+        self._scroll_after_id = self.canvas.get_tk_widget().after(
+            self.SCROLL_SETTLE_MS, self._on_scroll_settle
+        )
+
+    def _on_scroll_settle(self):
+        """Fired after wheel inactivity; commits one full redraw."""
+        self._scroll_after_id = None
+        self._finish_navigation()
 
     # --- Click + drag pan ---------------------------------------------
 
     def _on_press(self, event):
         if event.inaxes is not self.ax or event.button != 1 or event.xdata is None:
             return
+        self._cancel_scroll_settle()
+        self._begin_navigation()
         self._drag_anchor = event.xdata
+        self._drag_anchor_px = float(event.x)
+        self._drag_view_start = self.view_start
+        self._drag_span = self.view_end - self.view_start
 
     def _on_motion(self, event):
-        if self._drag_anchor is None or event.xdata is None:
+        if self._drag_anchor is None or self._drag_anchor_px is None:
             return
 
-        # Drag right → earlier in time (inverted: delta flipped)
-        delta = event.xdata - self._drag_anchor
-        span = self.view_end - self.view_start
-        new_start = self.view_start - delta
+        # Compute pan in pixel-space relative to press point so updates do not
+        # feed back through changing xlim transforms.
+        delta_px = float(event.x) - self._drag_anchor_px
+        span = self._drag_span if self._drag_span is not None else (self.view_end - self.view_start)
+        base_start = self._drag_view_start if self._drag_view_start is not None else self.view_start
+        px_width = max(1.0, float(self.ax.bbox.width))
+        new_start = base_start - (delta_px * span / px_width)
         new_end = new_start + span
 
         if new_start < 0.0:
@@ -268,29 +411,23 @@ class SpectrogramNavigator:
             new_end = self.total_duration
             new_start = max(0.0, new_end - span)
 
+        if abs(new_start - self.view_start) < 1e-12:
+            return
+
         self.view_start = new_start
         self.view_end = new_end
-        self._drag_anchor = event.xdata
-        self.ax.set_xlim(self.view_start, self.view_end)
-        self.canvas.draw()
+
+        # Defer axis drawing to the 60 Hz preview loop.
+        self._request_preview_draw()
 
     def _on_release(self, event):
-        if event.button != 1:
+        if event.button != 1 or self._drag_anchor is None:
             return
         self._drag_anchor = None
-        self.canvas.draw()
-        if self.on_view_change:
-            self.on_view_change()
-
-    # --- Redraw -------------------------------------------------------
-
-    def _apply_view_scroll(self):
-        """Scroll path: update xlim, render, and immediately recache the blit
-        background so the cursor update loop doesn't restore the stale frame."""
-        self.ax.set_xlim(self.view_start, self.view_end)
-        self.canvas.draw()
-        if self.on_view_change:
-            self.on_view_change()
+        self._drag_anchor_px = None
+        self._drag_view_start = None
+        self._drag_span = None
+        self._finish_navigation()
 
 
 
