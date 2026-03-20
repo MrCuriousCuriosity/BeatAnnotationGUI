@@ -8,9 +8,6 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 
 
-# Optional hardcoded audio path used by the Open button.
-HARDCODED_AUDIO_PATH = "Chopin Nocturne, op 27 no 2 - Maria João Pires live at Jardin Musical"
-
 
 # === Script for Main ToolBar (TOP) ===
 
@@ -41,15 +38,13 @@ class TopToolBar:
 
     def _on_open_click(self):
         """Handle Open button click."""
-        audio_path = HARDCODED_AUDIO_PATH
-        if not audio_path:
-            audio_path = filedialog.askopenfilename(
-                title="Choose audio file",
-                filetypes=[
-                    ("Audio files", "*.wav *.mp3 *.flac *.m4a *.aac *.opus *.aiff"),
-                    ("All files", "*.*"),
-                ],
-            )
+        audio_path = filedialog.askopenfilename(
+            title="Choose audio file",
+            filetypes=[
+                ("Audio files", "*.wav *.mp3 *.flac *.m4a *.aac *.opus *.aiff"),
+                ("All files", "*.*"),
+            ],
+        )
         if not audio_path:
             return
         if "on_open" in self.callbacks:
@@ -113,10 +108,6 @@ class TopToolBar:
         """Update the info label text."""
         self.info_var.set(text)
 
-    def get_info_text(self):
-        """Get the current info label text."""
-        return self.info_var.get()
-
     # === QUIT BUTTON ===
     def _setup_quit_button(self):
         """Setup the Quit button."""
@@ -127,7 +118,4 @@ class TopToolBar:
 
     def _on_quit_click(self):
         """Handle Quit button click."""
-        if "on_quit" in self.callbacks:
-            self.callbacks["on_quit"]()
-        else:
-            self.frame.winfo_toplevel().destroy()
+        self.frame.winfo_toplevel().destroy()

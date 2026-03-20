@@ -7,7 +7,6 @@ It orchestrates all modules and manages the overall application lifecycle.
 
 import tkinter as tk
 from tkinter import messagebox
-import sys
 from pathlib import Path
 import importlib.util
 
@@ -16,43 +15,40 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import modusa
 
-# Import custom modules with numeric prefixes
-current_dir = Path(__file__).parent
-spec_config = importlib.util.spec_from_file_location(
-    "spectogram_config", current_dir / "020_Spectogram.py"
-)
-spectogram_module = importlib.util.module_from_spec(spec_config)
-spec_config.loader.exec_module(spectogram_module)
-SpectrogramConfig = spectogram_module.SpectrogramConfig
-SpectrogramNavigator = spectogram_module.SpectrogramNavigator
 
-spec_toolbar = importlib.util.spec_from_file_location(
-    "toolbar", current_dir / "010_TopToolBar.py"
-)
-toolbar_module = importlib.util.module_from_spec(spec_toolbar)
-spec_toolbar.loader.exec_module(toolbar_module)
-TopToolBar = toolbar_module.TopToolBar
+# === Module Loading Helper ===
+def _load_module_class(module_name, file_name, class_name):
+    """
+    Dynamically load a class from a module file.
+    
+    Parameters
+    ----------
+    module_name : str
+        Internal module name (e.g., 'spectogram_config')
+    file_name : str
+        File name relative to script directory (e.g., '020_Spectogram.py')
+    class_name : str
+        Class name to extract from the module (e.g., 'SpectrogramConfig')
+    
+    Returns
+    -------
+    class
+        The requested class from the loaded module
+    """
+    current_dir = Path(__file__).parent
+    spec = importlib.util.spec_from_file_location(module_name, current_dir / file_name)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return getattr(module, class_name)
 
-spec_settings = importlib.util.spec_from_file_location(
-    "spectogram_settings", current_dir / "021_SpectogramSettings.py"
-)
-settings_module = importlib.util.module_from_spec(spec_settings)
-spec_settings.loader.exec_module(settings_module)
-SpectrogramSettings = settings_module.SpectrogramSettings
 
-spec_playback = importlib.util.spec_from_file_location(
-    "sound_playback", current_dir / "100_SoundPlayback.py"
-)
-playback_module = importlib.util.module_from_spec(spec_playback)
-spec_playback.loader.exec_module(playback_module)
-AudioPlayer = playback_module.AudioPlayer
-
-spec_cursor = importlib.util.spec_from_file_location(
-    "playback_cursor", current_dir / "101_PlayBackCursor.py"
-)
-cursor_module = importlib.util.module_from_spec(spec_cursor)
-spec_cursor.loader.exec_module(cursor_module)
-PlaybackCursor = cursor_module.PlaybackCursor
+# === Import custom modules with numeric prefixes ===
+SpectrogramConfig = _load_module_class("spectogram_config", "020_Spectogram.py", "SpectrogramConfig")
+SpectrogramNavigator = _load_module_class("spectogram_navigator", "020_Spectogram.py", "SpectrogramNavigator")
+TopToolBar = _load_module_class("toolbar", "010_TopToolBar.py", "TopToolBar")
+SpectrogramSettings = _load_module_class("spectogram_settings", "021_SpectogramSettings.py", "SpectrogramSettings")
+AudioPlayer = _load_module_class("sound_playback", "100_SoundPlayback.py", "AudioPlayer")
+PlaybackCursor = _load_module_class("playback_cursor", "101_PlayBackCursor.py", "PlaybackCursor")
 
 
 class SpectrogramApp:

@@ -6,6 +6,7 @@ and computation for the Beat Annotation GUI.
 """
 
 import numpy as np
+from matplotlib.ticker import MaxNLocator
 import modusa
 
 
@@ -189,6 +190,7 @@ class SpectrogramNavigator:
         self._drag_anchor_px = None
         self._drag_view_start = None
         self._drag_span = None
+        self._tick_locator = MaxNLocator(nbins=7)
         self._scroll_after_id = None
         self._preview_after_id = None
         self._preview_dirty = False
@@ -198,6 +200,7 @@ class SpectrogramNavigator:
         self._cids = []
 
         self._bind_events()
+        self._update_time_ticks()
         self._cache_axis_preview_background_from_current()
 
     # --- Public API ---------------------------------------------------
@@ -215,6 +218,7 @@ class SpectrogramNavigator:
         self._stop_preview_loop()
         self._cancel_scroll_settle()
         self.ax.set_xlim(self.view_start, self.view_end)
+        self._update_time_ticks()
         self._cache_axis_preview_background_from_current()
 
     def unbind_events(self):
@@ -263,10 +267,39 @@ class SpectrogramNavigator:
         self._nav_active = False
         self._stop_preview_loop()
         self.ax.set_xlim(self.view_start, self.view_end)
+        self._update_time_ticks()
         self.canvas.draw()
         if self.on_view_change:
             self.on_view_change()
         self._cache_axis_preview_background_from_current()
+
+    def _update_time_ticks(self):
+        """Force x-axis to include exact view start/end tick values."""
+        start = float(self.view_start)
+        end = float(self.view_end)
+        if not np.isfinite(start) or not np.isfinite(end):
+            return
+        if end < start:
+            start, end = end, start
+
+        span = end - start
+        if span <= 0.0:
+            self.ax.set_xticks([start])
+            return
+
+        auto_ticks = np.asarray(self._tick_locator.tick_values(start, end), dtype=float)
+        interior = auto_ticks[(auto_ticks > start) & (auto_ticks < end)]
+        ticks = np.concatenate(([start], interior, [end]))
+
+        # Remove near-duplicate values around the bounds.
+        eps = max(span * 1e-9, 1e-9)
+        dedup = [float(ticks[0])]
+        for value in ticks[1:]:
+            val = float(value)
+            if abs(val - dedup[-1]) > eps:
+                dedup.append(val)
+
+        self.ax.set_xticks(dedup)
 
     def _start_preview_loop(self):
         if self._preview_after_id is not None:
@@ -292,6 +325,7 @@ class SpectrogramNavigator:
         if self._preview_dirty:
             self._preview_dirty = False
             self.ax.set_xlim(self.view_start, self.view_end)
+            self._update_time_ticks()
             self._draw_axis_preview()
 
         self._preview_after_id = self.canvas.get_tk_widget().after(
