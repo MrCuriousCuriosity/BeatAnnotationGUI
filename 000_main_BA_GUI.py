@@ -10,10 +10,14 @@ from tkinter import messagebox
 from pathlib import Path
 import importlib.util
 
+import threading
+import tempfile
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import modusa
+from modusa.utils.youtube_downloader import download as yt_download
 
 
 # === Module Loading Helper ===
@@ -164,6 +168,7 @@ class SpectrogramApp:
         callbacks = {
             "on_open":     self.open_file,
             "on_settings": self.open_settings,
+            "on_youtube":  self._on_youtube,
             "on_play":     self._on_play,
             "on_pause":    self._on_pause,
             "on_stop":     self._on_stop,
@@ -283,6 +288,31 @@ class SpectrogramApp:
     def _on_nav_start(self):
         """Pause cursor blitting while the user is actively panning/zooming."""
         self._background = None
+
+    # === YOUTUBE DOWNLOAD ===
+    def _on_youtube(self, url):
+        """Download audio from a YouTube URL in a background thread, then load it."""
+        self.toolbar.set_info_text("Downloading from YouTube...")
+        self.toolbar.youtube_btn.config(state=tk.DISABLED)
+
+        def _worker():
+            try:
+                out_dir = tempfile.gettempdir()
+                audio_path = yt_download(url, content_type="audio", output_dir=out_dir)
+                self.root.after(0, lambda: self._on_youtube_done(str(audio_path)))
+            except Exception as e:
+                self.root.after(0, lambda err=e: self._on_youtube_error(err))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_youtube_done(self, audio_path):
+        self.toolbar.youtube_btn.config(state=tk.NORMAL)
+        self.open_file(audio_path)
+
+    def _on_youtube_error(self, error):
+        self.toolbar.youtube_btn.config(state=tk.NORMAL)
+        self.toolbar.set_info_text("Select an audio file to render spectrogram.")
+        messagebox.showerror("YouTube Download Error", str(error))
 
     def open_file(self, audio_path):
         """

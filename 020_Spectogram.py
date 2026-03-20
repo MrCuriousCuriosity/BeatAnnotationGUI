@@ -22,9 +22,9 @@ class SpectrogramConfig:
     # === Visualization parameters ===
     COLOR_SCHEME = "magma"  # Colormap for spectrogram
     ORIGIN = "lower"  # Origin position ('lower' or 'upper')
-    MIN_FREQ = 0            # Min frequency for display (Hz)
-    MAX_FREQ = 8000         # Max frequency for display (Hz)
-    DB_RANGE = 80           # Dynamic range in dB
+    MIN_FREQ = 20            # Min frequency for display (Hz)
+    MAX_FREQ = 7000         # Max frequency for display (Hz)
+    DB_RANGE = 60           # Dynamic range in dB
     NORMALIZE = True        # Normalize display to signal peak
 
     # === Render resolution ===

@@ -23,6 +23,7 @@ class TopToolBar:
 
         # Setup UI elements
         self._setup_open_button()
+        self._setup_youtube_button()
         self._setup_settings_button()
         self._setup_playback_buttons()
         self._setup_quit_button()
@@ -53,6 +54,42 @@ class TopToolBar:
             except Exception as e:
                 messagebox.showerror("Error", str(e))
 
+
+    # === YOUTUBE BUTTON ===
+    def _setup_youtube_button(self):
+        """Setup the Insert Youtube Performance button."""
+        self.youtube_btn = tk.Button(
+            self.frame, text="Insert Youtube Performance", command=self._on_youtube_click
+        )
+        self.youtube_btn.pack(side=tk.LEFT, padx=(8, 0))
+
+    def _on_youtube_click(self):
+        """Handle Youtube button click — show URL input dialog."""
+        dialog = tk.Toplevel(self.frame)
+        dialog.title("Insert YouTube Performance")
+        dialog.resizable(False, False)
+        dialog.grab_set()  # Make modal
+
+        tk.Label(dialog, text="YouTube URL:").pack(padx=12, pady=(12, 4))
+        url_var = tk.StringVar()
+        entry = tk.Entry(dialog, textvariable=url_var, width=52)
+        entry.pack(padx=12, pady=(0, 8))
+        entry.focus_set()
+
+        def _submit():
+            url = url_var.get().strip()
+            if not url:
+                return
+            dialog.destroy()
+            if "on_youtube" in self.callbacks:
+                self.callbacks["on_youtube"](url)
+
+        btn_frame = tk.Frame(dialog)
+        btn_frame.pack(pady=(0, 12))
+        tk.Button(btn_frame, text="Download", command=_submit).pack(side=tk.LEFT, padx=4)
+        tk.Button(btn_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=4)
+
+        dialog.bind("<Return>", lambda e: _submit())
 
     # === SPECTROGRAM SETTINGS BUTTON ===
     def _setup_settings_button(self):
