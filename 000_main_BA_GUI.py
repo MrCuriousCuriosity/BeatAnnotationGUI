@@ -246,9 +246,18 @@ class SpectrogramApp:
 
     def _on_settings_apply(self, settings):
         """Apply new spectrogram settings and redraw if audio is loaded."""
+        # Validate and clamp frequency bounds.
+        min_freq = max(0, int(settings["min_freq"]))
+        max_freq = int(settings["max_freq"])
+        if max_freq <= min_freq:
+            max_freq = min_freq + 1
+        if self.sr is not None:
+            nyquist = max(1, self.sr // 2)
+            max_freq = min(max_freq, nyquist)
+
         SpectrogramConfig.COLOR_SCHEME = settings["colormap"]
-        SpectrogramConfig.MIN_FREQ = settings["min_freq"]
-        SpectrogramConfig.MAX_FREQ = settings["max_freq"]
+        SpectrogramConfig.MIN_FREQ = min_freq
+        SpectrogramConfig.MAX_FREQ = max_freq
         SpectrogramConfig.WIN_LEN_SAMPLES = settings["win_len"]
         SpectrogramConfig.HOP_LEN_SAMPLES = settings["hop_len"]
         SpectrogramConfig.DB_RANGE = settings["db_range"]

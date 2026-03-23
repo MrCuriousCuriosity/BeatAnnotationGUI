@@ -135,8 +135,28 @@ class SpectrogramConfig:
 
         """
         ax.clear()
+
+        # Sanitize configured frequency range and clamp to available bins.
+        fmin = max(0.0, float(SpectrogramConfig.MIN_FREQ))
+        fmax = float(SpectrogramConfig.MAX_FREQ)
+        if fmax <= fmin:
+            fmax = fmin + 1.0
+
+        nyquist = float(freqs[-1]) if len(freqs) else fmax
+        fmax = min(fmax, nyquist)
+
+        # Keep only selected frequency rows for rendering.
+        mask = (freqs >= fmin) & (freqs <= fmax)
+        if np.any(mask):
+            freqs_plot = freqs[mask]
+            S_db_plot = S_db[mask, :]
+        else:
+            # Fallback if range is outside available bins.
+            freqs_plot = freqs
+            S_db_plot = S_db
+
         S_db_render = SpectrogramConfig.downsample_spectrogram(
-            S_db, SpectrogramConfig.RENDER_COLS
+            S_db_plot, SpectrogramConfig.RENDER_COLS
         )
         times_render = (
             np.linspace(times[0], times[-1], S_db_render.shape[1])
@@ -146,22 +166,25 @@ class SpectrogramConfig:
         modusa.paint.image(
             ax=ax,
             M=S_db_render,
-            y=freqs,
+            y=freqs_plot,
             x=times_render,
             c=SpectrogramConfig.COLOR_SCHEME,
             o=SpectrogramConfig.ORIGIN,
         )
 
-        # Apply dynamic range and normalization (use original S_db for global max)
+        # Apply dynamic range and normalization over rendered band.
         if ax.images:
-            vmax = float(S_db.max()) if SpectrogramConfig.NORMALIZE else 0.0
+            vmax = float(S_db_plot.max()) if SpectrogramConfig.NORMALIZE else 0.0
             vmin = vmax - SpectrogramConfig.DB_RANGE
             ax.images[-1].set_clim(vmin, vmax)
 
         ax.set_xlabel("Time (s)")
         ax.set_ylabel("Frequency (Hz)")
         ax.set_title(f"Spectrogram: {name}")
-        ax.set_ylim(SpectrogramConfig.MIN_FREQ, SpectrogramConfig.MAX_FREQ)
+        if len(freqs_plot):
+            ax.set_ylim(float(freqs_plot[0]), float(freqs_plot[-1]))
+        else:
+            ax.set_ylim(fmin, fmax)
 
 
 class SpectrogramNavigator:

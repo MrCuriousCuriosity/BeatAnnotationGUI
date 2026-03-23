@@ -112,11 +112,6 @@ class TopToolBar:
         )
         self.play_btn.pack(side=tk.LEFT, padx=(8, 0))
 
-        self.pause_btn = tk.Button(
-            self.frame, text="⏸ Pause", command=self._on_pause_click
-        )
-        self.pause_btn.pack(side=tk.LEFT, padx=(4, 0))
-
         self.stop_btn = tk.Button(
             self.frame, text="⏹ Stop", command=self._on_stop_click
         )
