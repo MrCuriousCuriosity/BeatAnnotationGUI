@@ -1,0 +1,87 @@
+<div class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+	<h2 class="settings-title" id="settingsTitle">Spectrogram Settings</h2>
+	<div class="settings-content">
+		<div class="settings-section">
+			<label class="settings-label" for="colormap">Colormap</label>
+			<select id="colormap" class="field select-field">
+				<option value="magma">magma</option>
+				<option value="viridis">viridis</option>
+				<option value="plasma">plasma</option>
+				<option value="inferno">inferno</option>
+				<option value="cividis">cividis</option>
+				<option value="twilight">twilight</option>
+				<option value="hot">hot</option>
+				<option value="cool">cool</option>
+				<option value="spring">spring</option>
+				<option value="summer">summer</option>
+				<option value="autumn">autumn</option>
+				<option value="winter">winter</option>
+				<option value="Greys">Greys</option>
+				<option value="gray">gray</option>
+				<option value="bone">bone</option>
+				<option value="pink">pink</option>
+			</select>
+		</div>
+
+		<div class="settings-section">
+			<span class="settings-label">Frequency Range (Hz)</span>
+			<div class="row">
+				<label for="minFreq">Min:</label>
+				<input id="minFreq" class="field number-field" type="number" min="0" max="20000" value="20">
+				<label for="maxFreq">Max:</label>
+				<input id="maxFreq" class="field number-field" type="number" min="0" max="20000" value="6000">
+			</div>
+		</div>
+
+		<div class="settings-section">
+			<label class="settings-label" for="winLen">Window Length (samples)</label>
+			<div class="range-wrap">
+				<input id="winLen" type="range" min="256" max="8192" value="2048" data-value-target="winLenValue">
+				<span id="winLenValue" class="value-pill">2048</span>
+			</div>
+		</div>
+
+		<div class="settings-section">
+			<label class="settings-label" for="hopLen">Hop Length (samples)</label>
+			<div class="range-wrap">
+				<input id="hopLen" type="range" min="64" max="2048" value="512" data-value-target="hopLenValue">
+				<span id="hopLenValue" class="value-pill">512</span>
+			</div>
+		</div>
+
+		<div class="settings-section">
+			<label class="settings-label" for="dbRange">Dynamic Range (dB)</label>
+			<div class="range-wrap">
+				<input id="dbRange" type="range" min="20" max="150" value="60" data-value-target="dbRangeValue">
+				<span id="dbRangeValue" class="value-pill">60</span>
+			</div>
+		</div>
+
+		<div class="settings-section">
+			<span class="settings-label">Display Options</span>
+			<div class="check-row">
+				<label><input id="normalize" type="checkbox" checked>Normalize spectrogram</label>
+				<label><input id="melView" type="checkbox">Mel Mode</label>
+			</div>
+		</div>
+
+		<div class="settings-section">
+			<label class="settings-label" for="melRows">Mel Render Rows</label>
+			<div class="range-wrap">
+				<input id="melRows" type="range" min="128" max="2048" value="768" data-value-target="melRowsValue">
+				<span id="melRowsValue" class="value-pill">768</span>
+			</div>
+		</div>
+
+		<div class="settings-section">
+			<label class="settings-label" for="renderCols">Render Resolution (columns)</label>
+			<div class="range-wrap">
+				<input id="renderCols" type="range" min="512" max="8192" value="4096" data-value-target="renderColsValue">
+				<span id="renderColsValue" class="value-pill">4096</span>
+			</div>
+		</div>
+	</div>
+	<div class="settings-footer">
+		<button type="button" class="enter-btn" id="settingsEnterBtn">Enter</button>
+	</div>
+</div>
