@@ -26,6 +26,8 @@ class SpectrogramSettings:
         "hop_len": 512,
         "db_range": 60,
         "normalize": True,
+        "mel_view": False,
+        "mel_rows": 768,
         "render_cols": 4096,
     }
 
@@ -64,12 +66,26 @@ class SpectrogramSettings:
         self._build_hop_section(main_frame)
         self._build_db_range_section(main_frame)
         self._build_normalize_section(main_frame)
+        self._build_mel_rows_section(main_frame)
         self._build_render_cols_section(main_frame)
 
         # Enter button pinned to the bottom of the window
         bottom_frame = ttk.Frame(self.window, padding=(15, 5, 15, 10))
         bottom_frame.pack(side=tk.BOTTOM, fill=tk.X)
-        ttk.Button(bottom_frame, text="Enter", command=self._on_apply).pack(side=tk.RIGHT)
+        # Use tk.Button here because ttk on macOS can render white text on white
+        # background in its default state for some themes.
+        tk.Button(
+            bottom_frame,
+            text="Enter",
+            command=self._on_apply,
+            fg="#000000",
+            bg="#e6e6e6",
+            activeforeground="#000000",
+            activebackground="#cfd8ff",
+            highlightthickness=0,
+            padx=12,
+            pady=4,
+        ).pack(side=tk.RIGHT)
 
     # --- Section Builders ---
 
@@ -126,12 +142,20 @@ class SpectrogramSettings:
         )
 
     def _build_normalize_section(self, parent):
-        """Build the normalize checkbox section."""
+        """Build the normalize and melodic-view checkbox section."""
         ttk.Label(parent, text="Display Options", font=("Arial", 10, "bold")).pack(anchor="w", pady=(0, 5))
+        options_frame = ttk.Frame(parent)
+        options_frame.pack(anchor="w", pady=(0, 15), fill=tk.X)
+
         self.normalize_var = tk.BooleanVar(value=self.settings["normalize"])
-        ttk.Checkbutton(parent, text="Normalize spectrogram", variable=self.normalize_var).pack(
-            anchor="w", pady=(0, 15)
-        )
+        ttk.Checkbutton(
+            options_frame, text="Normalize spectrogram", variable=self.normalize_var
+        ).pack(side=tk.LEFT, anchor="w")
+
+        self.log_freq_var = tk.BooleanVar(value=self.settings.get("mel_view", False))
+        ttk.Checkbutton(
+            options_frame, text="Melodic View", variable=self.log_freq_var
+        ).pack(side=tk.LEFT, anchor="w", padx=(20, 0))
 
     def _build_render_cols_section(self, parent):
         """Build the render resolution (scale) section."""
@@ -139,6 +163,14 @@ class SpectrogramSettings:
         self.render_cols_var = tk.IntVar(value=self.settings.get("render_cols", 4096))
         self._scale_labels["render_cols"] = self._create_scale_input(
             parent, self.render_cols_var, 512, 8192
+        )
+
+    def _build_mel_rows_section(self, parent):
+        """Build the Mel view render density section."""
+        ttk.Label(parent, text="Mel Render Rows", font=("Arial", 10, "bold")).pack(anchor="w", pady=(0, 5))
+        self.mel_rows_var = tk.IntVar(value=self.settings.get("mel_rows", 768))
+        self._scale_labels["mel_rows"] = self._create_scale_input(
+            parent, self.mel_rows_var, 128, 2048
         )
 
     # --- Helper Methods ---
@@ -182,13 +214,15 @@ class SpectrogramSettings:
     def _on_apply(self):
         """Apply settings and close window."""
         self.settings = {
-            "colormap": self.colormap_var.get(),
-            "min_freq": self.min_freq_var.get(),
-            "max_freq": self.max_freq_var.get(),
-            "win_len": int(self.win_len_var.get()),
-            "hop_len": int(self.hop_len_var.get()),
-            "db_range": int(self.db_range_var.get()),
-            "normalize": self.normalize_var.get(),
+            "colormap":    self.colormap_var.get(),
+            "min_freq":    self.min_freq_var.get(),
+            "max_freq":    self.max_freq_var.get(),
+            "win_len":     int(self.win_len_var.get()),
+            "hop_len":     int(self.hop_len_var.get()),
+            "db_range":    int(self.db_range_var.get()),
+            "normalize":   self.normalize_var.get(),
+            "mel_view":    self.log_freq_var.get(),
+            "mel_rows":    int(self.mel_rows_var.get()),
             "render_cols": int(self.render_cols_var.get()),
         }
 

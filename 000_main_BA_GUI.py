@@ -53,6 +53,7 @@ TopToolBar = _load_module_class("toolbar", "010_TopToolBar.py", "TopToolBar")
 SpectrogramSettings = _load_module_class("spectogram_settings", "021_SpectogramSettings.py", "SpectrogramSettings")
 AudioPlayer = _load_module_class("sound_playback", "100_SoundPlayback.py", "AudioPlayer")
 PlaybackCursor = _load_module_class("playback_cursor", "101_PlayBackCursor.py", "PlaybackCursor")
+MeiPanel = _load_module_class("mei_panel", "030_MEI.py", "MeiPanel")
 
 
 class SpectrogramApp:
@@ -73,6 +74,10 @@ class SpectrogramApp:
     FIGURE_CENTER_X   = 0.5
     FIGURE_CENTER_Y   = 0.35
     FIGURE_DPI = 100
+
+    # === MEI Panel Layout ===
+    MEI_HEIGHT_RATIO = 1/3 # Relative height in relation to the spectrogram height
+    MEI_GAP_PX = 10
 
     def __init__(self, root):
         """
@@ -114,6 +119,9 @@ class SpectrogramApp:
         # Playback engine and cursor
         self.player = AudioPlayer()
         self.playback_cursor = None
+
+        # MEI panel below spectrogram
+        self.mei_panel = None
 
         # UI update loop handle
         self._loop_id = None
@@ -161,6 +169,10 @@ class SpectrogramApp:
         self.ax.xaxis.label.set_color(fg)
         self.ax.yaxis.label.set_color(fg)
         self.ax.title.set_color(fg)
+
+        # MEI panel border/background
+        if self.mei_panel is not None:
+            self.mei_panel.set_theme(border_color=fg, bg_color=bg)
     # === ===
 
     def _setup_toolbar(self):
@@ -184,27 +196,51 @@ class SpectrogramApp:
             dpi=self.FIGURE_DPI,
         )
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
-        widget = self.canvas.get_tk_widget()
-        cx = int(self.window_width  * self.FIGURE_CENTER_X)
-        cy = int(self.window_height * self.FIGURE_CENTER_Y)
-        widget.place(anchor='center', x=cx, y=cy, width=init_w, height=init_h)
+
+        # Create MEI panel and perform initial layout.
+        self.mei_panel = MeiPanel(self.root)
+        self._layout_spectrogram_and_mei(self.window_width, self.window_height)
 
         # Reposition/resize figure whenever the window changes (including fullscreen)
         self.root.bind("<Configure>", self._on_window_resize)
+
+    def _layout_spectrogram_and_mei(self, window_w, window_h):
+        """Layout spectrogram and MEI panel with panel below spectrogram."""
+        canvas_w_spectogram = int(window_w * self.FIGURE_WIDTH_PCT)
+        canvas_h = int(window_h * self.FIGURE_HEIGHT_PCT)
+        if canvas_w_spectogram < 1 or canvas_h < 1:
+            return
+
+        spec_cx = int(window_w * self.FIGURE_CENTER_X)
+        spec_cy = int(window_h * self.FIGURE_CENTER_Y)
+
+        widget = self.canvas.get_tk_widget()
+        widget.place(anchor='center', x=spec_cx, y=spec_cy, width=canvas_w_spectogram, height=canvas_h)
+        self.fig.set_size_inches(canvas_w_spectogram / self.FIGURE_DPI, canvas_h / self.FIGURE_DPI)
+
+        # Use the actual matplotlib axes box so the MEI panel aligns with the
+        # rendered spectrogram image area rather than the full figure canvas.
+        ax_pos = self.ax.get_position()
+        canvas_w_mei = int(canvas_w_spectogram * ax_pos.width)
+        mei_cx = int(spec_cx + ((ax_pos.x0 + ax_pos.width / 2.0) - 0.5) * canvas_w_spectogram)
+
+        mei_h = max(20, int(canvas_h * self.MEI_HEIGHT_RATIO))
+        mei_cy = spec_cy + (canvas_h // 2) + self.MEI_GAP_PX + (mei_h // 2)
+
+        # Keep the MEI panel inside the window if the layout would overflow.
+        mei_bottom = mei_cy + (mei_h // 2)
+        overflow = mei_bottom - int(window_h)
+        if overflow > 0:
+            mei_cy -= overflow
+
+        if self.mei_panel is not None:
+            self.mei_panel.place(mei_cx, mei_cy, canvas_w_mei, mei_h)
 
     def _on_window_resize(self, event):
         """Resize and reposition the matplotlib figure to track the window dimensions."""
         if event.widget is not self.root:
             return
-        canvas_w = int(event.width  * self.FIGURE_WIDTH_PCT)
-        canvas_h = int(event.height * self.FIGURE_HEIGHT_PCT)
-        if canvas_w < 1 or canvas_h < 1:
-            return
-        cx = int(event.width  * self.FIGURE_CENTER_X)
-        cy = int(event.height * self.FIGURE_CENTER_Y)
-        widget = self.canvas.get_tk_widget()
-        widget.place(anchor='center', x=cx, y=cy, width=canvas_w, height=canvas_h)
-        self.fig.set_size_inches(canvas_w / self.FIGURE_DPI, canvas_h / self.FIGURE_DPI)
+        self._layout_spectrogram_and_mei(event.width, event.height)
         self.canvas.draw_idle()
 
     def open_settings(self):
@@ -228,13 +264,15 @@ class SpectrogramApp:
             hop_len = SpectrogramConfig.HOP_LEN_SAMPLES or SpectrogramSettings.DEFAULTS["hop_len"]
 
         current_settings = {
-            "colormap": SpectrogramConfig.COLOR_SCHEME,
-            "min_freq": SpectrogramConfig.MIN_FREQ,
-            "max_freq": SpectrogramConfig.MAX_FREQ,
-            "win_len": win_len,
-            "hop_len": hop_len,
-            "db_range": SpectrogramConfig.DB_RANGE,
-            "normalize": SpectrogramConfig.NORMALIZE,
+            "colormap":    SpectrogramConfig.COLOR_SCHEME,
+            "min_freq":    SpectrogramConfig.MIN_FREQ,
+            "max_freq":    SpectrogramConfig.MAX_FREQ,
+            "win_len":     win_len,
+            "hop_len":     hop_len,
+            "db_range":    SpectrogramConfig.DB_RANGE,
+            "normalize":   SpectrogramConfig.NORMALIZE,
+            "mel_view":    SpectrogramConfig.MEL_VIEW,
+            "mel_rows":    SpectrogramConfig.MEL_MIN_RENDER_ROWS,
             "render_cols": SpectrogramConfig.RENDER_COLS,
         }
 
@@ -246,6 +284,10 @@ class SpectrogramApp:
 
     def _on_settings_apply(self, settings):
         """Apply new spectrogram settings and redraw if audio is loaded."""
+        prev_view = None
+        if self.navigator is not None:
+            prev_view = (self.navigator.view_start, self.navigator.view_end)
+
         # Validate and clamp frequency bounds.
         min_freq = max(0, int(settings["min_freq"]))
         max_freq = int(settings["max_freq"])
@@ -260,8 +302,10 @@ class SpectrogramApp:
         SpectrogramConfig.MAX_FREQ = max_freq
         SpectrogramConfig.WIN_LEN_SAMPLES = settings["win_len"]
         SpectrogramConfig.HOP_LEN_SAMPLES = settings["hop_len"]
-        SpectrogramConfig.DB_RANGE = settings["db_range"]
-        SpectrogramConfig.NORMALIZE = settings["normalize"]
+        SpectrogramConfig.DB_RANGE    = settings["db_range"]
+        SpectrogramConfig.NORMALIZE   = settings["normalize"]
+        SpectrogramConfig.MEL_VIEW    = settings["mel_view"]
+        SpectrogramConfig.MEL_MIN_RENDER_ROWS = max(32, int(settings["mel_rows"]))
         SpectrogramConfig.RENDER_COLS = settings["render_cols"]
         self._settings_window = None
 
@@ -276,13 +320,29 @@ class SpectrogramApp:
                     self.ax, S_db, freqs, times, self.audio_name
                 )
                 self._apply_theme()
+
+                # Preserve the current time viewport after settings changes.
+                if prev_view is not None and self.navigator is not None:
+                    total_duration = len(self.audio_mono) / self.sr
+                    start = max(0.0, min(float(prev_view[0]), total_duration))
+                    end = max(0.0, min(float(prev_view[1]), total_duration))
+                    min_span = SpectrogramNavigator.MIN_WINDOW_SEC
+                    if end - start < min_span:
+                        end = min(total_duration, start + min_span)
+                        start = max(0.0, end - min_span)
+                    self.navigator.total_duration = total_duration
+                    self.navigator.view_start = start
+                    self.navigator.view_end = end
+                    self.ax.set_xlim(start, end)
+                    self.navigator._update_time_ticks()
+
                 self.canvas.draw()
                 self._background = self.canvas.copy_from_bbox(self.ax.bbox)
 
                 # Recreate cursor on the redrawn axes
                 self.playback_cursor = PlaybackCursor(self.ax)
 
-                if self.navigator is not None:
+                if self.navigator is not None and prev_view is None:
                     self.navigator.reset(self.navigator.total_duration)
             except Exception as e:
                 messagebox.showerror("Settings Error", str(e))

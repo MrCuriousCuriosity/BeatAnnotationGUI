@@ -26,6 +26,8 @@ class SpectrogramConfig:
     MAX_FREQ = 7000         # Max frequency for display (Hz)
     DB_RANGE = 60           # Dynamic range in dB
     NORMALIZE = True        # Normalize display to signal peak
+    MEL_VIEW  = False       # Display frequency axis on the Mel scale
+    MEL_MIN_RENDER_ROWS = 768  # Minimum Mel rows to avoid blocky low-frequency view
 
     # === Render resolution ===
     RENDER_COLS = 4096      # Time columns in the pre-downsampled display image
@@ -116,6 +118,46 @@ class SpectrogramConfig:
         return np.maximum.reduceat(S_db, indices[:-1], axis=1)
 
     @staticmethod
+    def _bin_edges(centers):
+        """Compute bin edges from bin centers for use with pcolormesh."""
+        c = np.asarray(centers, dtype=float)
+        edges = np.empty(len(c) + 1)
+        edges[1:-1] = (c[:-1] + c[1:]) / 2
+        edges[0]  = c[0]  - (c[1]  - c[0])  / 2
+        edges[-1] = c[-1] + (c[-1] - c[-2]) / 2
+        return edges
+
+    @staticmethod
+    def _hz_to_mel(f):
+        """Convert Hz to Mel: mel(f) = 2595 * log10(1 + f / 700)."""
+        return 2595.0 * np.log10(1.0 + np.asarray(f, dtype=float) / 700.0)
+
+    @staticmethod
+    def _mel_to_hz(m):
+        """Convert Mel to Hz (inverse of _hz_to_mel)."""
+        return 700.0 * (10.0 ** (np.asarray(m, dtype=float) / 2595.0) - 1.0)
+
+    @staticmethod
+    def _resample_to_mel_grid(S_db, freqs_hz, min_rows):
+        """Interpolate rows to a denser Mel-spaced grid for smoother Mel rendering."""
+        freqs_hz = np.asarray(freqs_hz, dtype=float)
+        if len(freqs_hz) < 2:
+            return S_db, freqs_hz
+
+        target_rows = int(max(len(freqs_hz), min_rows))
+        if target_rows <= len(freqs_hz):
+            return S_db, freqs_hz
+
+        mel_in = SpectrogramConfig._hz_to_mel(freqs_hz)
+        mel_out = np.linspace(mel_in[0], mel_in[-1], target_rows)
+        S_out = np.empty((target_rows, S_db.shape[1]), dtype=S_db.dtype)
+
+        for col in range(S_db.shape[1]):
+            S_out[:, col] = np.interp(mel_out, mel_in, S_db[:, col])
+
+        return S_out, SpectrogramConfig._mel_to_hz(mel_out)
+
+    @staticmethod
     def paint_spectrogram(ax, S_db, freqs, times, name):
         """
         Paint spectrogram on matplotlib axes.
@@ -163,25 +205,57 @@ class SpectrogramConfig:
             if S_db_render.shape[1] != len(times)
             else times
         )
-        modusa.paint.image(
-            ax=ax,
-            M=S_db_render,
-            y=freqs_plot,
-            x=times_render,
-            c=SpectrogramConfig.COLOR_SCHEME,
-            o=SpectrogramConfig.ORIGIN,
-        )
+        # dB limits — always derived from the rendered band.
+        vmax = float(S_db_plot.max()) if SpectrogramConfig.NORMALIZE else 0.0
+        vmin = vmax - SpectrogramConfig.DB_RANGE
 
-        # Apply dynamic range and normalization over rendered band.
-        if ax.images:
-            vmax = float(S_db_plot.max()) if SpectrogramConfig.NORMALIZE else 0.0
-            vmin = vmax - SpectrogramConfig.DB_RANGE
-            ax.images[-1].set_clim(vmin, vmax)
+        if SpectrogramConfig.MEL_VIEW and len(freqs_plot) > 1:
+            # pcolormesh with Mel y-coordinates: each row is spaced by
+            # mel(f) = 2595*log10(1 + f/700), so low frequencies get more
+            # vertical space and high frequencies are compressed.
+            S_db_mel, freqs_mel_hz = SpectrogramConfig._resample_to_mel_grid(
+                S_db_render, freqs_plot, SpectrogramConfig.MEL_MIN_RENDER_ROWS
+            )
+            mel_coords = SpectrogramConfig._hz_to_mel(freqs_mel_hz)
+            t_edges = SpectrogramConfig._bin_edges(times_render)
+            m_edges = SpectrogramConfig._bin_edges(mel_coords)
+            ax.pcolormesh(
+                t_edges, m_edges, S_db_mel,
+                cmap=SpectrogramConfig.COLOR_SCHEME,
+                shading='flat',
+                vmin=vmin, vmax=vmax,
+            )
+            ax.set_yscale('linear')  # axis is already in Mel space; no extra log needed
+            # Place y-ticks at musically meaningful Hz values and label them in Hz.
+            flo, fhi = float(freqs_plot[0]), float(freqs_plot[-1])
+            candidate_hz = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
+            tick_hz = [h for h in candidate_hz if flo <= h <= fhi]
+            if not tick_hz:
+                tick_hz = [flo, fhi]
+            ax.set_yticks(SpectrogramConfig._hz_to_mel(tick_hz))
+            ax.set_yticklabels([f"{int(h)}" for h in tick_hz])
+            ax.set_ylim(mel_coords[0], mel_coords[-1])
+        else:
+            modusa.paint.image(
+                ax=ax,
+                M=S_db_render,
+                y=freqs_plot,
+                x=times_render,
+                c=SpectrogramConfig.COLOR_SCHEME,
+                o=SpectrogramConfig.ORIGIN,
+            )
+            ax.set_yscale('linear')
+            if ax.images:
+                ax.images[-1].set_clim(vmin, vmax)
 
         ax.set_xlabel("Time (s)")
         ax.set_ylabel("Frequency (Hz)")
         ax.set_title(f"Spectrogram: {name}")
-        if len(freqs_plot):
+        if SpectrogramConfig.MEL_VIEW and len(freqs_plot) > 1:
+            mel_min = float(SpectrogramConfig._hz_to_mel(freqs_plot[0]))
+            mel_max = float(SpectrogramConfig._hz_to_mel(freqs_plot[-1]))
+            ax.set_ylim(mel_min, mel_max)
+        elif len(freqs_plot):
             ax.set_ylim(float(freqs_plot[0]), float(freqs_plot[-1]))
         else:
             ax.set_ylim(fmin, fmax)
