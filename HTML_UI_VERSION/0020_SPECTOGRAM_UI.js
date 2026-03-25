@@ -7,12 +7,10 @@ let fileInput = null;
 let waveformEl = null;
 let spectrogramEl = null;
 let cursorEl = null;
-let interactionsBound = false;
+let zoomSliderEl = null;
+let scrollSyncEl = null;
 let currentMinPxPerSec = 4;
-let calculatedMinZoom = 2; // Stores the full-audio zoom level (max zoom out)
-const ZOOM_MIN_PX_PER_SEC = 2;  // Fallback minimum (original default)
-const ZOOM_MAX_PX_PER_SEC = 320;
-const ZOOM_FACTOR = 1.15;
+const FIXED_PX_PER_SEC = 4;
 
 function sendInfo(text) {
 	const infoText = document.getElementById("infoText");
@@ -36,8 +34,16 @@ function clearTimers() {
 	}
 }
 
+function handleTimelineScroll() {
+	updatePlaybackCursor();
+}
+
 function destroyWaveSurfer() {
 	clearTimers();
+	if (scrollSyncEl) {
+		scrollSyncEl.removeEventListener("scroll", handleTimelineScroll);
+		scrollSyncEl = null;
+	}
 	if (wavesurfer) {
 		wavesurfer.destroy();
 		wavesurfer = null;
@@ -54,13 +60,43 @@ function updatePlaybackCursor() {
 		return;
 	}
 	const time = wavesurfer.getCurrentTime() || 0;
-	const worldX = time * currentMinPxPerSec;
+	const duration = wavesurfer.getDuration() || 0;
+	let worldX = time * currentMinPxPerSec;
+	if (duration > 0 && scrollTarget.scrollWidth > 0) {
+		const timeRatio = Math.max(0, Math.min(1, time / duration));
+		worldX = timeRatio * scrollTarget.scrollWidth;
+	}
 	const viewportX = worldX - scrollTarget.scrollLeft;
-	cursorEl.style.left = `${Math.max(0, viewportX)}px`;
+	const maxX = Math.max(0, spectrogramEl.clientWidth - 2);
+	cursorEl.style.left = `${Math.max(0, Math.min(maxX, viewportX))}px`;
 	cursorEl.hidden = false;
 }
 
-
+function bindZoomSlider() {
+	if (!zoomSliderEl || zoomSliderEl.dataset.bound === "1") {
+		return;
+	}
+	zoomSliderEl.dataset.bound = "1";
+	zoomSliderEl.addEventListener("input", (event) => {
+		if (!wavesurfer) {
+			return;
+		}
+		const minPxPerSec = event.target.valueAsNumber;
+		if (!Number.isFinite(minPxPerSec)) {
+			return;
+		}
+		currentMinPxPerSec = minPxPerSec;
+		if (typeof wavesurfer.zoom === "function") {
+			wavesurfer.zoom(minPxPerSec);
+		} else if (typeof wavesurfer.setOptions === "function") {
+			wavesurfer.setOptions({ minPxPerSec });
+		}
+		requestAnimationFrame(() => {
+			bindScrollCursorSync();
+			updatePlaybackCursor();
+		});
+	});
+}
 
 function getTimelineScrollElement() {
 	if (!spectrogramEl) {
@@ -76,9 +112,9 @@ function getTimelineScrollElement() {
 	// Try regular DOM queries
 	const candidates = [
 		spectrogramEl.querySelector('[part="scroll"]'),
-		spectrogramEl.querySelector('.scroll'),
+		spectrogramEl.querySelector(".scroll"),
 		spectrogramEl.querySelector('[class*="scroll"]'),
-		spectrogramEl.querySelector('canvas')?.parentElement,
+		spectrogramEl.querySelector("canvas")?.parentElement,
 	];
 	for (const el of candidates) {
 		if (el && el.scrollWidth > el.clientWidth) {
@@ -89,80 +125,18 @@ function getTimelineScrollElement() {
 	return spectrogramEl;
 }
 
-
-
-function calculateFullAudioZoom() {
-	if (!spectrogramEl || !wavesurfer) {
-		return ZOOM_MIN_PX_PER_SEC;
-	}
-	const duration = wavesurfer.getDuration();
-	const containerWidth = spectrogramEl.clientWidth;
-	if (duration <= 0 || containerWidth <= 0) {
-		return ZOOM_MIN_PX_PER_SEC;
-	}
-	// Calculate pxPerSec needed to fit entire audio in container
-	const fullAudioZoom = containerWidth / duration;
-	// Clamp to reasonable bounds
-	return Math.max(ZOOM_MIN_PX_PER_SEC, Math.min(ZOOM_MAX_PX_PER_SEC, fullAudioZoom));
-}
-
-function applyZoom(nextMinPxPerSec, anchorClientX) {
-	if (!wavesurfer || !spectrogramEl) {
+function bindScrollCursorSync() {
+	const nextScrollEl = getTimelineScrollElement();
+	if (!nextScrollEl) {
 		return;
 	}
-	const clamped = Math.max(calculatedMinZoom, Math.min(ZOOM_MAX_PX_PER_SEC, nextMinPxPerSec));
-	if (Math.abs(clamped - currentMinPxPerSec) < 0.001) {
-		return;
+	if (scrollSyncEl && scrollSyncEl !== nextScrollEl) {
+		scrollSyncEl.removeEventListener("scroll", handleTimelineScroll);
 	}
-
-	const rect = spectrogramEl.getBoundingClientRect();
-	const anchorX = Math.max(0, Math.min(rect.width, anchorClientX - rect.left));
-	const previousZoom = currentMinPxPerSec;
-	const scrollTarget = getTimelineScrollElement();
-	if (!scrollTarget) {
-		return;
+	if (scrollSyncEl !== nextScrollEl) {
+		scrollSyncEl = nextScrollEl;
+		scrollSyncEl.addEventListener("scroll", handleTimelineScroll, { passive: true });
 	}
-	const previousScrollLeft = scrollTarget.scrollLeft;
-	const anchorWorldBefore = previousScrollLeft + anchorX;
-
-	if (typeof wavesurfer.zoom === "function") {
-		wavesurfer.zoom(clamped);
-	} else if (typeof wavesurfer.setOptions === "function") {
-		wavesurfer.setOptions({ minPxPerSec: clamped });
-	}
-	currentMinPxPerSec = clamped;
-
-
-	requestAnimationFrame(() => {
-		const activeScrollTarget = getTimelineScrollElement();
-		if (!spectrogramEl || !activeScrollTarget) {
-			return;
-		}
-		const zoomRatio = clamped / Math.max(0.0001, previousZoom);
-		const newScrollLeft = Math.max(0, anchorWorldBefore * zoomRatio - anchorX);
-		activeScrollTarget.scrollLeft = newScrollLeft;
-	});
-}
-
-function bindZoomAndPanInteractions() {
-	if (interactionsBound || !spectrogramEl) {
-		return;
-	}
-	interactionsBound = true;
-
-	spectrogramEl.addEventListener(
-		"wheel",
-		(event) => {
-			if (!wavesurfer) {
-				return;
-			}
-			event.preventDefault();
-			const zoomIn = event.deltaY < 0;
-			const factor = zoomIn ? ZOOM_FACTOR : 1 / ZOOM_FACTOR;
-			applyZoom(currentMinPxPerSec * factor, event.clientX);
-		},
-		{ passive: false }
-	);
 }
 
 function getSafeSettings(raw) {
@@ -216,11 +190,10 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false) {
 
 	const settings = getSafeSettings(rawSettings);
 	destroyWaveSurfer();
-	currentMinPxPerSec = Math.max(4, Math.min(12, Math.round(settings.renderCols / 512)));
+	currentMinPxPerSec = Number(zoomSliderEl?.valueAsNumber) || FIXED_PX_PER_SEC;
 
 	waveformEl.hidden = true;
 	spectrogramEl.hidden = false;
-	bindZoomAndPanInteractions();
 
 	const spectrogramHeight = Math.max(80, spectrogramEl.clientHeight);
 	const spectrogramPlugin = window.WaveSurfer.Spectrogram.create({
@@ -264,12 +237,7 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false) {
 	}
 
 	wavesurfer.on("ready", () => {
-		// Calculate and apply the full-audio zoom as the maximum zoom-out point
-		calculatedMinZoom = calculateFullAudioZoom();
-		const fullAudioZoomPixelsPerSec = calculatedMinZoom;
-		if (Math.abs(fullAudioZoomPixelsPerSec - currentMinPxPerSec) > 0.001) {
-			applyZoom(fullAudioZoomPixelsPerSec, 0);
-		}
+		bindScrollCursorSync();
 		if (startAtSec > 0) {
 			wavesurfer.setTime(startAtSec);
 		}
@@ -280,6 +248,9 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false) {
 			sendInfo(`Loaded: ${currentAudioName}`);
 		} else {
 			sendInfo("Audio loaded.");
+		}
+		if (zoomSliderEl) {
+			zoomSliderEl.value = String(Math.round(currentMinPxPerSec));
 		}
 		updatePlaybackCursor();
 
@@ -431,7 +402,9 @@ fetch("0021_SPECTOGRAM.html")
 		waveformEl = document.getElementById("waveform");
 		spectrogramEl = document.getElementById("spectrogramCanvas");
 		cursorEl = document.getElementById("spectrogramCursor");
+		zoomSliderEl = document.getElementById("spectrogramZoom");
 
+		bindZoomSlider();
 		attachSpectrogramListeners();
 		sendInfo("Select an audio file to render spectrogram.");
 	})

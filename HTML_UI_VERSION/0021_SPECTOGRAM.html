@@ -1,6 +1,7 @@
 <section class="spectogram-area" aria-label="Spectogram Placeholder">
 	<div class="panel">
 		<div id="waveform" class="waveform" hidden></div>
+		<label> Zoom: <input id="spectrogramZoom" type="range" min="10" max="1000" value="100" /></label>
 		<div id="spectrogramCanvas" class="spectrogram-canvas" hidden>
 		<div class="spectrogram-playback-cursor" id="spectrogramCursor" hidden></div>
 	</div>
@@ -9,7 +10,7 @@
 
 <style>
 	.spectogram-area {
-		flex: 1;
+		flex: 0.9;
 		width: 100%;
 		border: 2px solid var(--spec-outline);
 		border-radius: 6px;
