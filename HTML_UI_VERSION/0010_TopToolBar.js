@@ -8,11 +8,11 @@ fetch('0011_TopToolBar.html')
     .catch(error => console.error('Error loading toolbar:', error));
 
 function openFilePicker() {
-    if (!window.fileInput) {
-        console.error("Audio input element is not ready.");
+    if (typeof window.BA_spectrogramCommand !== "function") {
+        console.error("Spectrogram command handler is not ready.");
         return;
     }
-    window.fileInput.click();
+    window.BA_spectrogramCommand("open-file");
 }
 
 function openMeiFilePicker() {
@@ -34,23 +34,23 @@ function attachToolbarEventListeners() {
     });
 
     document.getElementById("youtubeBtn").addEventListener("click", () => {
-        window.BA_spectrogramActions?.youtube?.();
+        window.BA_spectrogramCommand?.("youtube");
     });
 
     document.getElementById("spectogramSettingsBtn").addEventListener("click", () => {
-        window.BA_spectrogramActions?.openSettings?.();
+        window.BA_spectrogramCommand?.("open-settings");
     });
 
     document.getElementById("playBtn").addEventListener("click", () => {
-        window.BA_spectrogramActions?.togglePlayback?.();
+        window.BA_spectrogramCommand?.("play-toggle");
     });
 
     document.getElementById("stopBtn").addEventListener("click", () => {
-        window.BA_spectrogramActions?.stop?.();
+        window.BA_spectrogramCommand?.("stop");
     });
     
     document.getElementById("quitBtn").addEventListener("click", () => {
-        window.BA_spectrogramActions?.quit?.();
+        window.BA_spectrogramCommand?.("quit");
     });
 
     // Set up MEI file input handler

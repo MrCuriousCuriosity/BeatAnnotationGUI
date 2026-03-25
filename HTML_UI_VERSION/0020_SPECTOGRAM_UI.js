@@ -6,6 +6,7 @@ let liveUpdateTimer = null;
 let fileInput = null;
 let waveformEl = null;
 let spectrogramEl = null;
+let cursorEl = null;
 let interactionsBound = false;
 let currentMinPxPerSec = 4;
 let calculatedMinZoom = 2; // Stores the full-audio zoom level (max zoom out)
@@ -41,8 +42,22 @@ function destroyWaveSurfer() {
 		wavesurfer.destroy();
 		wavesurfer = null;
 	}
-	const cursorEl = document.getElementById('spectrogramCursor');
 	if (cursorEl) cursorEl.hidden = true;
+}
+
+function updatePlaybackCursor() {
+	if (!cursorEl || !wavesurfer || !spectrogramEl) {
+		return;
+	}
+	const scrollTarget = getTimelineScrollElement();
+	if (!scrollTarget) {
+		return;
+	}
+	const time = wavesurfer.getCurrentTime() || 0;
+	const worldX = time * currentMinPxPerSec;
+	const viewportX = worldX - scrollTarget.scrollLeft;
+	cursorEl.style.left = `${Math.max(0, viewportX)}px`;
+	cursorEl.hidden = false;
 }
 
 
@@ -207,13 +222,12 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false) {
 	spectrogramEl.hidden = false;
 	bindZoomAndPanInteractions();
 
-	const spectrogramHeight = Math.max(80, spectrogramEl.clientHeight);
+	const spectrogramHeight = Math.max(80, spectrogramEl.clientHeight-20);
 	const spectrogramPlugin = window.WaveSurfer.Spectrogram.create({
 		container: "#spectrogramCanvas",
 		height: spectrogramHeight,
 		labels: true,
 		labelsColor: "#ffffff",
-		//labelsBackground: "rgba(0, 255, 0, 0.45)",
 		labelsHzColor: "#ffd400",
 		splitChannels: false,
 		useWebWorker: true,
@@ -234,7 +248,7 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false) {
 			container: "#spectrogramCanvas",
 			url: audioUrl,
 			sampleRate: 44100,
-			height: 0,
+			height: 30,
 			waveColor: "rgba(0,0,0,0)",
 			progressColor: "rgba(0,0,0,0)",
 			cursorColor: "rgba(0,0,0,0)",
@@ -267,6 +281,7 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false) {
 		} else {
 			sendInfo("Audio loaded.");
 		}
+		updatePlaybackCursor();
 
 	});
 
@@ -274,6 +289,22 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false) {
 
 	wavesurfer.on("loading", (percent) => {
 		sendInfo(`Loading audio... ${Math.max(0, Math.min(100, Math.round(percent)))}%`);
+	});
+
+	wavesurfer.on("timeupdate", () => {
+		updatePlaybackCursor();
+	});
+
+	wavesurfer.on("seek", () => {
+		updatePlaybackCursor();
+	});
+
+	wavesurfer.on("pause", () => {
+		updatePlaybackCursor();
+	});
+
+	wavesurfer.on("finish", () => {
+		updatePlaybackCursor();
 	});
 
 	wavesurfer.on("error", (err) => {
@@ -399,6 +430,7 @@ fetch("0021_SPECTOGRAM.html")
 		fileInput = document.getElementById("audioFileInput");
 		waveformEl = document.getElementById("waveform");
 		spectrogramEl = document.getElementById("spectrogramCanvas");
+		cursorEl = document.getElementById("spectrogramCursor");
 
 		attachSpectrogramListeners();
 		sendInfo("Select an audio file to render spectrogram.");
