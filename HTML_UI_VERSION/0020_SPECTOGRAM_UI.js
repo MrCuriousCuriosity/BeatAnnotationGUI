@@ -222,7 +222,7 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false) {
 	spectrogramEl.hidden = false;
 	bindZoomAndPanInteractions();
 
-	const spectrogramHeight = Math.max(80, spectrogramEl.clientHeight-20);
+	const spectrogramHeight = Math.max(80, spectrogramEl.clientHeight);
 	const spectrogramPlugin = window.WaveSurfer.Spectrogram.create({
 		container: "#spectrogramCanvas",
 		height: spectrogramHeight,
@@ -248,7 +248,7 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false) {
 			container: "#spectrogramCanvas",
 			url: audioUrl,
 			sampleRate: 44100,
-			height: 30,
+			height: 0,
 			waveColor: "rgba(0,0,0,0)",
 			progressColor: "rgba(0,0,0,0)",
 			cursorColor: "rgba(0,0,0,0)",
