@@ -73,155 +73,30 @@ body {
 
 .workspace {
 	flex: 1;
-	padding: 14px;
+	padding: 10px;
 	display: flex;
 	flex-direction: column;
 	gap: 10px;
 	min-height: 0;
 }
-
-.spectogram-area {
-	flex: 1;
-	width: 100%;
-	border: 2px solid var(--spec-outline);
-	border-radius: 6px;
-	display: flex;
-	flex-direction: column;
-	padding: 0;
-	color: var(--spec-outline);
-	min-height: 180px;
-}
-
-.spec-title {
-	font-size: 15px;
-	font-weight: 700;
-	margin-bottom: 8px;
-}
-
-.panel {
-	width: 100%;
-	height: 100%;
-	display: flex;
-	flex-direction: column;
-	gap: 0;
-	min-height: 0;
-	position: relative;
-}
-
-.spec-empty {
-	flex: 1;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	text-align: center;
-	font-size: 18px;
-	font-weight: 600;
-	padding: 10px;
-}
-
-.waveform {
-	flex: 1;
-	width: 100%;
-	height: 100%;
-	min-height: 0;
-	margin: 0;
-	padding: 0;
-	border: 1px solid #5a4d00;
-	border-radius: 0;
-	background: #101010;
-	overflow: hidden;
-}
-
-.spectrogram-canvas {
-	flex: 1;
-	width: 100%;
-	min-height: 0;
-	border: 1px solid #5a4d00;
-	background: #101010;
-	overflow: hidden;
-	position: relative;
-}
-
-#spectrogramCanvas .canvases {
-	display: none !important;
-	height: 0 !important;
-	min-height: 0 !important;
-}
-
-.spectrogram-playback-cursor {
-	position: absolute;
-	top: 24px;
-	bottom: 0;
-	left: 0;
-	width: 2px;
-	background: #00e5ff;
-	box-shadow: 0 0 6px rgba(0, 229, 255, 0.75);
-	pointer-events: none;
-	z-index: 4;
-}
-
-.spectrogram-time-ruler {
-	position: absolute;
-	left: 0;
-	right: 0;
-	top: 0;
-	height: 24px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.35);
-	background: rgba(0, 0, 0, 0.62);
-	pointer-events: none;
-	z-index: 5;
-}
-
-.spectrogram-time-tick {
-	position: absolute;
-	top: 0;
-	width: 1px;
-	height: 7px;
-	background: rgba(255, 255, 255, 0.7);
-	transform: translateX(-0.5px);
-}
-
-.spectrogram-time-label {
-	position: absolute;
-	top: 9px;
-	transform: translateX(-50%);
-	font-size: 14px;
-	line-height: 1;
-	color: #e7e7e7;
-	white-space: nowrap;
-	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-.mei-area {
-	flex: 1;
-	width: 100%;
-	border: 2px solid var(--mei-outline);
-	border-radius: 6px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	text-align: center;
-	padding: 10px;
-	font-size: 20px;
-	font-weight: 600;
-	color: var(--mei-outline);
-	min-height: 100px;
-}
-
-#spectrogramContainer {
-	flex: 2.1;
-	min-height: 0;
-	display: flex;
-	flex-direction: column;
-}
-
-#meiContainer {
-	flex: 1;
-	min-height: 0;
-	display: flex;
-	flex-direction: column;
-}
-
+	#spectrogramContainer {
+		flex: 1.7;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	#timelineContainer {
+		flex: 0.4;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	#meiContainer {
+		flex: 0.9;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
 .toolbar-spacer {
 	margin-left: auto;
 }

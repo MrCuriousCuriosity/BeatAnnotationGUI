@@ -3,13 +3,10 @@ let wavesurfer = null;
 let currentAudioUrl = null;
 let currentAudioName = null;
 let liveUpdateTimer = null;
-let renderWatchdogTimer = null;
 let fileInput = null;
 let waveformEl = null;
 let spectrogramEl = null;
-let playbackCursorEl = null;
 let timeRulerEl = null;
-let layoutSyncListenerBound = false;
 let interactionsBound = false;
 let timelineScrollBoundEl = null;
 let currentMinPxPerSec = 4;
@@ -28,23 +25,16 @@ function sendInfo(text) {
 
 function mapColorSchemeToWaveSurfer(colormap) {
 	const key = String(colormap || "").toLowerCase();
-	if (key === "gray" || key === "greys" || key === "bone") {
-		return "gray";
+	if (key === "gray" || key === "igray" || key === "roseus") {
+		return key;
 	}
-	if (key === "hot" || key === "inferno" || key === "magma" || key === "plasma") {
-		return "roseus";
-	}
-	return "igray";
+	return "roseus";
 }
 
 function clearTimers() {
 	if (liveUpdateTimer) {
 		clearTimeout(liveUpdateTimer);
 		liveUpdateTimer = null;
-	}
-	if (renderWatchdogTimer) {
-		clearTimeout(renderWatchdogTimer);
-		renderWatchdogTimer = null;
 	}
 }
 
@@ -54,39 +44,6 @@ function destroyWaveSurfer() {
 		wavesurfer.destroy();
 		wavesurfer = null;
 	}
-}
-
-function ensurePlaybackCursor() {
-	if (!spectrogramEl) {
-		return;
-	}
-	if (playbackCursorEl && playbackCursorEl.isConnected) {
-		return;
-	}
-	playbackCursorEl = document.createElement("div");
-	playbackCursorEl.className = "spectrogram-playback-cursor";
-	spectrogramEl.appendChild(playbackCursorEl);
-}
-
-function updatePlaybackCursor() {
-	if (!wavesurfer || !spectrogramEl) {
-		return;
-	}
-	ensurePlaybackCursor();
-	if (!playbackCursorEl) {
-		return;
-	}
-	const duration = wavesurfer.getDuration();
-	if (!duration || duration <= 0) {
-		playbackCursorEl.style.left = "0px";
-		return;
-	}
-	const scrollTarget = getTimelineScrollElement();
-	const scrollLeft = scrollTarget ? scrollTarget.scrollLeft : 0;
-	const currentTime = wavesurfer.getCurrentTime();
-	const worldX = currentTime * Math.max(1, currentMinPxPerSec);
-	const x = Math.round(worldX - scrollLeft);
-	playbackCursorEl.style.left = `${x}px`;
 }
 
 function getTimelineScrollElement() {
@@ -116,9 +73,6 @@ function getTimelineScrollElement() {
 	return spectrogramEl;
 }
 
-let lastScrollLeft = 0;
-let scrollSyncAnimationFrame = null;
-
 function bindTimelineScrollSync() {
 	const nextEl = getTimelineScrollElement();
 	if (!nextEl) {
@@ -132,29 +86,10 @@ function bindTimelineScrollSync() {
 	}
 	timelineScrollBoundEl = nextEl;
 	nextEl.addEventListener("scroll", handleTimelineScroll);
-	lastScrollLeft = nextEl.scrollLeft || 0;
-	
-	// Add backup continuous sync for when scroll events don't fire reliably
-	if (scrollSyncAnimationFrame) {
-		cancelAnimationFrame(scrollSyncAnimationFrame);
-	}
-	function continuousScrollSync() {
-		if (timelineScrollBoundEl) {
-			const currentScroll = timelineScrollBoundEl.scrollLeft || 0;
-			if (Math.abs(currentScroll - lastScrollLeft) > 0.5) {
-				lastScrollLeft = currentScroll;
-				// renderTimeRuler();
-				// updatePlaybackCursor();
-			}
-		}
-		scrollSyncAnimationFrame = requestAnimationFrame(continuousScrollSync);
-	}
-	scrollSyncAnimationFrame = requestAnimationFrame(continuousScrollSync);
 }
 
 function handleTimelineScroll() {
-	// renderTimeRuler();
-	// updatePlaybackCursor();
+	renderTimeRuler();
 }
 
 function formatTimeLabel(totalSeconds) {
@@ -292,8 +227,6 @@ function applyZoom(nextMinPxPerSec, anchorClientX) {
 		}
 			const zoomRatio = clamped / Math.max(0.0001, previousZoom);
 		activeScrollTarget.scrollLeft = Math.max(0, anchorWorldBefore * zoomRatio - anchorX);
-		// renderTimeRuler();
-		// updatePlaybackCursor();
 	});
 }
 
@@ -318,33 +251,18 @@ function bindZoomAndPanInteractions() {
 	);
 }
 
-function ensureLayoutSyncListener() {
-	if (layoutSyncListenerBound) {
-		return;
-	}
-	layoutSyncListenerBound = true;
-	window.addEventListener("resize", () => {
-		// renderTimeRuler();
-		// updatePlaybackCursor();
-	});
-}
-
-function getSafeSettings(raw, qualityMode) {
-	const isLite = qualityMode === "lite";
+function getSafeSettings(raw) {
 	const frequencyMin = Math.max(0, Number(raw.frequencyMin) || 20);
 	const frequencyMax = Math.max(frequencyMin + 1, Number(raw.frequencyMax) || 6000);
-	const fftSamples = isLite ? 512 : Math.max(256, Math.min(4096, Number(raw.fftSamples) || 2048));
-	const renderCols = isLite ? 1024 : Math.max(512, Math.min(4096, Number(raw.renderCols) || 2048));
-	const melRows = isLite ? 256 : Math.max(128, Math.min(1536, Number(raw.melRows) || 768));
-	const noverlap = isLite
-		? 256
-		: Math.max(0, Math.min(Math.floor(fftSamples / 2), Number(raw.noverlap) || 0));
+	const fftSamples = Math.max(256, Math.min(4096, Number(raw.fftSamples) || 2048));
+	const renderCols = Math.max(512, Math.min(4096, Number(raw.renderCols) || 2048));
+	const melRows = Math.max(128, Math.min(1536, Number(raw.melRows) || 768));
+	const noverlap = Math.max(0, Math.min(Math.floor(fftSamples / 2), Number(raw.noverlap) || 0));
 	const rangeDB = Math.max(20, Math.min(150, Number(raw.rangeDB) || 60));
 	const allowedScales = ["linear", "logarithmic", "mel", "bark", "erb"];
 	const scale = allowedScales.includes(raw.scale) ? raw.scale : "mel";
 
 	return {
-		isLite,
 		frequencyMin,
 		frequencyMax,
 		fftSamples,
@@ -354,11 +272,11 @@ function getSafeSettings(raw, qualityMode) {
 		rangeDB,
 		scale,
 		normalize: raw.normalize !== false,
-		colormap: raw.colormap || "magma",
+		colormap: raw.colormap || "roseus",
 	};
 }
 
-function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false, qualityMode = "normal") {
+function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false) {
 	if (!window.WaveSurfer || !window.WaveSurfer.Spectrogram) {
 		sendInfo("WaveSurfer Spectrogram plugin failed to load.");
 		return;
@@ -370,7 +288,7 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false, qualityMod
 
 	const rawSettings =
 		window.BA_spectrogramSettings?.read?.() ?? {
-			colormap: "magma",
+			colormap: "roseus",
 			frequencyMin: 20,
 			frequencyMax: 6000,
 			fftSamples: 2048,
@@ -382,27 +300,24 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false, qualityMod
 			noverlap: 1536,
 		};
 
-	const settings = getSafeSettings(rawSettings, qualityMode);
+	const settings = getSafeSettings(rawSettings);
 	destroyWaveSurfer();
 	currentMinPxPerSec = Math.max(4, Math.min(12, Math.round(settings.renderCols / 512)));
 
 	waveformEl.hidden = true;
 	spectrogramEl.hidden = false;
-	// ensurePlaybackCursor();
-	// ensureTimeRuler();
-	ensureLayoutSyncListener();
 	bindZoomAndPanInteractions();
 
 	const spectrogramPlugin = window.WaveSurfer.Spectrogram.create({
 		container: "#spectrogramCanvas",
 		height: Math.max(80, spectrogramEl.clientHeight - TIME_RULER_HEIGHT_PX),
-		labels: !settings.isLite,
+		labels: true,
 		labelsColor: "#ffffff",
-		labelsBackground: "rgba(0,0,0,0.45)",
+		//labelsBackground: "rgba(0, 255, 0, 0.45)",
 		labelsHzColor: "#ffd400",
 		splitChannels: false,
 		useWebWorker: true,
-		scale: settings.isLite ? "linear" : settings.scale,
+		scale: settings.scale,
 		frequencyMin: settings.frequencyMin,
 		frequencyMax: settings.frequencyMax,
 		fftSamples: settings.fftSamples,
@@ -436,23 +351,7 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false, qualityMod
 
 	requestAnimationFrame(() => {
 		bindTimelineScrollSync();
-		// renderTimeRuler();
-		// updatePlaybackCursor();
 	});
-
-	spectrogramPlugin.on("ready", () => {
-		if (renderWatchdogTimer) {
-			clearTimeout(renderWatchdogTimer);
-			renderWatchdogTimer = null;
-		}
-	});
-
-	renderWatchdogTimer = setTimeout(() => {
-		if (qualityMode === "normal" && currentAudioUrl === audioUrl) {
-			sendInfo("Spectrogram rendering is heavy; retrying in compatibility mode...");
-			createWaveSurfer(audioUrl, startAtSec, autoplay, "lite");
-		}
-	}, 7000);
 
 	wavesurfer.on("ready", () => {
 		bindTimelineScrollSync();
@@ -462,8 +361,6 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false, qualityMod
 		if (Math.abs(fullAudioZoomPixelsPerSec - currentMinPxPerSec) > 0.001) {
 			applyZoom(fullAudioZoomPixelsPerSec, 0);
 		}
-		// renderTimeRuler();
-		// updatePlaybackCursor();
 		if (startAtSec > 0) {
 			wavesurfer.setTime(startAtSec);
 		}
@@ -471,7 +368,7 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false, qualityMod
 			wavesurfer.play();
 		}
 		if (currentAudioName) {
-			sendInfo(`Loaded: ${currentAudioName}${qualityMode === "lite" ? " (compatibility mode)" : ""}`);
+			sendInfo(`Loaded: ${currentAudioName}`);
 		} else {
 			sendInfo("Audio loaded.");
 		}
@@ -479,19 +376,6 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false, qualityMod
 
 	wavesurfer.on("loading", (percent) => {
 		sendInfo(`Loading audio... ${Math.max(0, Math.min(100, Math.round(percent)))}%`);
-	});
-
-	wavesurfer.on("audioprocess", () => {
-		// updatePlaybackCursor();
-	});
-
-	wavesurfer.on("seek", () => {
-		// renderTimeRuler();
-		// updatePlaybackCursor();
-	});
-
-	wavesurfer.on("finish", () => {
-		// updatePlaybackCursor();
 	});
 
 	wavesurfer.on("error", (err) => {

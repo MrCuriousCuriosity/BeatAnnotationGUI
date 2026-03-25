@@ -28,7 +28,7 @@ const BA_spectrogramSettings = (() => {
 	function read() {
 		if (!elements.colormap) {
 			return {
-				colormap: "magma",
+				colormap: "roseus",
 				frequencyMin: 20,
 				frequencyMax: 6000,
 				fftSamples: 2048,
