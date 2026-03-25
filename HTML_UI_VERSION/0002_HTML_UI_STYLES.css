@@ -78,21 +78,17 @@ body {
 	flex-direction: column;
 	gap: 10px;
 	min-height: 0;
+	overflow: hidden;
 }
 	#spectrogramContainer {
-		flex: 1.7;
+		flex: 0.6;
 		min-height: 0;
 		display: flex;
 		flex-direction: column;
-	}
-	#timelineContainer {
-		flex: 0.4;
-		min-height: 0;
-		display: flex;
-		flex-direction: column;
+		overflow: hidden;
 	}
 	#meiContainer {
-		flex: 0.9;
+		flex: 0.4;
 		min-height: 0;
 		display: flex;
 		flex-direction: column;

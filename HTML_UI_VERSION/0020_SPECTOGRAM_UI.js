@@ -6,12 +6,9 @@ let liveUpdateTimer = null;
 let fileInput = null;
 let waveformEl = null;
 let spectrogramEl = null;
-let timeRulerEl = null;
 let interactionsBound = false;
-let timelineScrollBoundEl = null;
 let currentMinPxPerSec = 4;
 let calculatedMinZoom = 2; // Stores the full-audio zoom level (max zoom out)
-const TIME_RULER_HEIGHT_PX = 24;
 const ZOOM_MIN_PX_PER_SEC = 2;  // Fallback minimum (original default)
 const ZOOM_MAX_PX_PER_SEC = 320;
 const ZOOM_FACTOR = 1.15;
@@ -44,7 +41,27 @@ function destroyWaveSurfer() {
 		wavesurfer.destroy();
 		wavesurfer = null;
 	}
+	const cursorEl = document.getElementById('spectrogramCursor');
+	if (cursorEl) cursorEl.hidden = true;
 }
+
+function updateSpectrogramCursor() {
+	const cursorEl = document.getElementById('spectrogramCursor');
+	if (!cursorEl || !wavesurfer || !spectrogramEl) return;
+	if (wavesurfer.getDuration() <= 0) return;
+	const scrollEl = getTimelineScrollElement();
+	const scrollLeft = scrollEl ? scrollEl.scrollLeft : 0;
+	const cursorX = wavesurfer.getCurrentTime() * currentMinPxPerSec - scrollLeft;
+	const containerWidth = spectrogramEl.clientWidth;
+	if (cursorX >= 0 && cursorX <= containerWidth) {
+		cursorEl.style.left = cursorX + 'px';
+		cursorEl.hidden = false;
+	} else {
+		cursorEl.hidden = true;
+	}
+}
+
+
 
 function getTimelineScrollElement() {
 	if (!spectrogramEl) {
@@ -73,35 +90,7 @@ function getTimelineScrollElement() {
 	return spectrogramEl;
 }
 
-function bindTimelineScrollSync() {
-	const nextEl = getTimelineScrollElement();
-	if (!nextEl) {
-		return;
-	}
-	if (timelineScrollBoundEl === nextEl) {
-		return;
-	}
-	if (timelineScrollBoundEl) {
-		timelineScrollBoundEl.removeEventListener("scroll", handleTimelineScroll);
-	}
-	timelineScrollBoundEl = nextEl;
-	nextEl.addEventListener("scroll", handleTimelineScroll);
-}
 
-function handleTimelineScroll() {
-	renderTimeRuler();
-}
-
-function formatTimeLabel(totalSeconds) {
-	const sec = Math.max(0, Math.floor(totalSeconds));
-	const hours = Math.floor(sec / 3600);
-	const minutes = Math.floor((sec % 3600) / 60);
-	const seconds = sec % 60;
-	if (hours > 0) {
-		return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-	}
-	return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
 
 function calculateFullAudioZoom() {
 	if (!spectrogramEl || !wavesurfer) {
@@ -116,82 +105,6 @@ function calculateFullAudioZoom() {
 	const fullAudioZoom = containerWidth / duration;
 	// Clamp to reasonable bounds
 	return Math.max(ZOOM_MIN_PX_PER_SEC, Math.min(ZOOM_MAX_PX_PER_SEC, fullAudioZoom));
-}
-
-function pickTickStep(durationSec) {
-	const steps = [0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 20, 30, 60, 120, 300, 600, 900, 1800];
-	const targetTicks = 16;
-	const desired = Math.max(0.1, durationSec / targetTicks);
-	for (const step of steps) {
-		if (step >= desired) {
-			return step;
-		}
-	}
-	return steps[steps.length - 1];
-}
-
-function ensureTimeRuler() {
-	if (!spectrogramEl) {
-		return;
-	}
-	if (timeRulerEl && timeRulerEl.isConnected) {
-		return;
-	}
-	timeRulerEl = document.createElement("div");
-	timeRulerEl.className = "spectrogram-time-ruler";
-	spectrogramEl.appendChild(timeRulerEl);
-}
-
-function renderTimeRuler() {
-	if (!spectrogramEl || !wavesurfer) {
-		return;
-	}
-	ensureTimeRuler();
-	if (!timeRulerEl) {
-		return;
-	}
-	const duration = wavesurfer.getDuration();
-	const width = spectrogramEl.clientWidth;
-	const scrollTarget = getTimelineScrollElement();
-	const scrollLeft = scrollTarget ? scrollTarget.scrollLeft : 0;
-	timeRulerEl.innerHTML = "";
-	if (!duration || duration <= 0 || width <= 0) {
-		return;
-	}
-	const pxPerSec = Math.max(1, currentMinPxPerSec);
-	const visibleStartTime = Math.max(0, scrollLeft / pxPerSec);
-	const visibleEndTime = Math.min(duration, (scrollLeft + width) / pxPerSec);
-	const visibleDuration = Math.max(0.001, visibleEndTime - visibleStartTime);
-
-	const step = pickTickStep(visibleDuration);
-	const pixelsPerStep = step * pxPerSec;
-	const labelEvery = Math.max(1, Math.ceil(72 / Math.max(1, pixelsPerStep)));
-	let index = 0;
-	const startTickTime = Math.floor(visibleStartTime / step) * step;
-
-	for (let t = startTickTime; t <= visibleEndTime + step * 0.5; t += step) {
-		const timeSec = Math.min(duration, t);
-		const x = Math.round(timeSec * pxPerSec - scrollLeft);
-
-		const tick = document.createElement("div");
-		tick.className = "spectrogram-time-tick";
-		tick.style.left = `${x}px`;
-		timeRulerEl.appendChild(tick);
-
-		const isFinalTick = duration - timeSec < step * 0.5;
-		if (index % labelEvery === 0 || isFinalTick) {
-			const label = document.createElement("span");
-			label.className = "spectrogram-time-label";
-			label.style.left = `${x}px`;
-			label.textContent = formatTimeLabel(timeSec);
-			timeRulerEl.appendChild(label);
-		}
-
-		if (isFinalTick) {
-			break;
-		}
-		index += 1;
-	}
 }
 
 function applyZoom(nextMinPxPerSec, anchorClientX) {
@@ -220,13 +133,16 @@ function applyZoom(nextMinPxPerSec, anchorClientX) {
 	}
 	currentMinPxPerSec = clamped;
 
+
 	requestAnimationFrame(() => {
 		const activeScrollTarget = getTimelineScrollElement();
 		if (!spectrogramEl || !activeScrollTarget) {
 			return;
 		}
-			const zoomRatio = clamped / Math.max(0.0001, previousZoom);
-		activeScrollTarget.scrollLeft = Math.max(0, anchorWorldBefore * zoomRatio - anchorX);
+		const zoomRatio = clamped / Math.max(0.0001, previousZoom);
+		const newScrollLeft = Math.max(0, anchorWorldBefore * zoomRatio - anchorX);
+		activeScrollTarget.scrollLeft = newScrollLeft;
+		updateSpectrogramCursor();
 	});
 }
 
@@ -308,9 +224,10 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false) {
 	spectrogramEl.hidden = false;
 	bindZoomAndPanInteractions();
 
+	const spectrogramHeight = Math.max(80, spectrogramEl.clientHeight);
 	const spectrogramPlugin = window.WaveSurfer.Spectrogram.create({
 		container: "#spectrogramCanvas",
-		height: Math.max(80, spectrogramEl.clientHeight - TIME_RULER_HEIGHT_PX),
+		height: spectrogramHeight,
 		labels: true,
 		labelsColor: "#ffffff",
 		//labelsBackground: "rgba(0, 255, 0, 0.45)",
@@ -340,7 +257,7 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false) {
 			cursorColor: "rgba(0,0,0,0)",
 			cursorWidth: 0,
 			minPxPerSec: currentMinPxPerSec,
-			autoScroll: false,
+			autoScroll: true,
 			plugins: [spectrogramPlugin],
 		});
 	} catch (error) {
@@ -349,12 +266,7 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false) {
 		return;
 	}
 
-	requestAnimationFrame(() => {
-		bindTimelineScrollSync();
-	});
-
 	wavesurfer.on("ready", () => {
-		bindTimelineScrollSync();
 		// Calculate and apply the full-audio zoom as the maximum zoom-out point
 		calculatedMinZoom = calculateFullAudioZoom();
 		const fullAudioZoomPixelsPerSec = calculatedMinZoom;
@@ -372,7 +284,15 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false) {
 		} else {
 			sendInfo("Audio loaded.");
 		}
+		const scrollEl = getTimelineScrollElement();
+		if (scrollEl && !scrollEl._scrollSyncBound) {
+			scrollEl._scrollSyncBound = true;
+			scrollEl.addEventListener('scroll', () => updateSpectrogramCursor(), { passive: true });
+		}
+		updateSpectrogramCursor();
 	});
+
+	wavesurfer.on("timeupdate", () => updateSpectrogramCursor());
 
 	wavesurfer.on("loading", (percent) => {
 		sendInfo(`Loading audio... ${Math.max(0, Math.min(100, Math.round(percent)))}%`);
@@ -485,6 +405,12 @@ function handleCommand(command) {
 }
 
 window.BA_spectrogramCommand = handleCommand;
+
+window.BA_spectrogram = {
+	seek(time) { wavesurfer?.setTime(time); },
+	getDuration() { return wavesurfer?.getDuration() ?? 0; },
+	isPlaying() { return wavesurfer?.isPlaying() ?? false; },
+};
 
 // Load spectrogram HTML from 0021_SPECTOGRAM.html
 fetch("0021_SPECTOGRAM.html")
