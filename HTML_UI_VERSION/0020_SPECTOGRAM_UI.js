@@ -133,6 +133,7 @@ function bindTimelineScrollSync() {
 	timelineScrollBoundEl = nextEl;
 	nextEl.addEventListener("scroll", handleTimelineScroll);
 	lastScrollLeft = nextEl.scrollLeft || 0;
+	syncTimelineScroll(lastScrollLeft);
 	
 	// Add backup continuous sync for when scroll events don't fire reliably
 	if (scrollSyncAnimationFrame) {
@@ -143,6 +144,7 @@ function bindTimelineScrollSync() {
 			const currentScroll = timelineScrollBoundEl.scrollLeft || 0;
 			if (Math.abs(currentScroll - lastScrollLeft) > 0.5) {
 				lastScrollLeft = currentScroll;
+				syncTimelineScroll(currentScroll);
 				// renderTimeRuler();
 				// updatePlaybackCursor();
 			}
@@ -153,8 +155,26 @@ function bindTimelineScrollSync() {
 }
 
 function handleTimelineScroll() {
+	// Scroll event handler - sync is handled by continuousScrollSync
 	// renderTimeRuler();
 	// updatePlaybackCursor();
+}
+
+function syncTimelineScroll(scrollLeft) {
+	// Sync the timeline plugin's scroll position with the spectrogram's scroll
+	try {
+		const timelineEl = document.querySelector('#spectrogramCanvas .wavesurfer-timeline');
+		if (timelineEl) {
+			timelineEl.scrollLeft = scrollLeft;
+		}
+		// Also try to find and sync the timeline canvas wrapper
+		const timelineCanvas = document.querySelector('#spectrogramCanvas .wavesurfer-timeline canvas');
+		if (timelineCanvas && timelineCanvas.parentElement) {
+			timelineCanvas.parentElement.scrollLeft = scrollLeft;
+		}
+	} catch (e) {
+		// Silently fail if timeline elements don't exist yet
+	}
 }
 
 function formatTimeLabel(totalSeconds) {
@@ -290,8 +310,10 @@ function applyZoom(nextMinPxPerSec, anchorClientX) {
 		if (!spectrogramEl || !activeScrollTarget) {
 			return;
 		}
-			const zoomRatio = clamped / Math.max(0.0001, previousZoom);
-		activeScrollTarget.scrollLeft = Math.max(0, anchorWorldBefore * zoomRatio - anchorX);
+		const zoomRatio = clamped / Math.max(0.0001, previousZoom);
+		const newScrollLeft = Math.max(0, anchorWorldBefore * zoomRatio - anchorX);
+		activeScrollTarget.scrollLeft = newScrollLeft;
+		syncTimelineScroll(newScrollLeft);
 		// renderTimeRuler();
 		// updatePlaybackCursor();
 	});
@@ -414,6 +436,14 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false, qualityMod
 		maxCanvasWidth: Math.max(1024, settings.renderCols),
 	});
 
+	const timelinePlugin = window.WaveSurfer.Timeline.create({
+		container: "#spectrogramCanvas",
+		primaryColor: "#ffd400",
+		secondaryColor: "#ffffff",
+		primaryLabelInterval: 10,
+		secondaryLabelInterval: 2,
+	});
+
 	try {
 		wavesurfer = window.WaveSurfer.create({
 			container: "#spectrogramCanvas",
@@ -422,11 +452,12 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false, qualityMod
 			height: 0,
 			waveColor: "rgba(0,0,0,0)",
 			progressColor: "rgba(0,0,0,0)",
-			cursorColor: "rgba(0,0,0,0)",
-			cursorWidth: 0,
+			cursorColor: "#ff0000",
+			cursorWidth: 2,
 			minPxPerSec: currentMinPxPerSec,
 			autoScroll: false,
-			plugins: [spectrogramPlugin],
+			hideScrollbar: true,
+			plugins: [spectrogramPlugin, timelinePlugin],
 		});
 	} catch (error) {
 		sendInfo(`Spectrogram render failed: ${String(error)}`);
