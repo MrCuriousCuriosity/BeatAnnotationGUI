@@ -141,6 +141,12 @@ body {
 	overflow: hidden;
 }
 
+#spectrogramCanvas .canvases {
+	display: none !important;
+	height: 0 !important;
+	min-height: 0 !important;
+}
+
 .mei-area {
 	flex: 1;
 	width: 100%;

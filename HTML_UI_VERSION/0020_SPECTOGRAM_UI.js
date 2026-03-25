@@ -106,7 +106,7 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false, qualityMod
 
 	const spectrogramPlugin = window.WaveSurfer.Spectrogram.create({
 		container: "#spectrogramCanvas",
-		height: Math.max(140, Math.min(420, Math.round(settings.melRows / 3))),
+		height: spectrogramEl.clientHeight,
 		labels: !settings.isLite,
 		labelsColor: "#ffffff",
 		labelsBackground: "rgba(0,0,0,0.45)",
@@ -130,7 +130,7 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false, qualityMod
 			container: "#spectrogramCanvas",
 			url: audioUrl,
 			sampleRate: 44100,
-			height: 100,
+			height: 0,
 			waveColor: "rgba(0,0,0,0)",
 			progressColor: "rgba(0,0,0,0)",
 			cursorColor: "rgba(0,0,0,0)",
