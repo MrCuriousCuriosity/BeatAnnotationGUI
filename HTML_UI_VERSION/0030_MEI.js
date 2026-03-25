@@ -1,8 +1,12 @@
+// Module-level variables
+let meiFileInput = null;
+
 // Load MEI HTML from 0031_MEI.html
 fetch('0031_MEI.html')
 	.then(response => response.text())
 	.then(html => {
 		document.getElementById('meiContainer').innerHTML = html;
+		meiFileInput = document.getElementById('meiFileInput');
 	})
 	.catch(error => console.error('Error loading MEI:', error));
 
@@ -108,5 +112,33 @@ class MeiSvgRenderer {
     async renderAsDataUrl(meiFile) {
         const svg = await this.renderFromFile(meiFile);
         return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    }
+}
+
+/**
+ * Global handler for MEI file selection
+ * Called when user picks a .mei file from the file picker
+ * @param {File} meiFile - The selected MEI file
+ */
+async function handleMeiFileSelection(meiFile) {
+    try {
+        // Create renderer instance
+        const renderer = new MeiSvgRenderer();
+
+        // Render the MEI file to SVG
+        const svg = await renderer.renderFromFile(meiFile);
+
+        // Display the SVG inside the existing MEI area so layout and scrolling remain intact
+        const meiArea = document.querySelector('.mei-area');
+        if (meiArea) {
+            meiArea.innerHTML = '<div class="mei-svg-host"></div>';
+            meiArea.querySelector('.mei-svg-host').innerHTML = svg;
+        }
+    } catch (error) {
+        console.error('Error rendering MEI file:', error);
+        const meiArea = document.querySelector('.mei-area');
+        if (meiArea) {
+            meiArea.innerHTML = `<div style="color: red; padding: 20px;">Error loading MEI file: ${error.message}</div>`;
+        }
     }
 }

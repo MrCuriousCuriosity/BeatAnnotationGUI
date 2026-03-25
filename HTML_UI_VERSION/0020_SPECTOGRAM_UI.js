@@ -45,22 +45,6 @@ function destroyWaveSurfer() {
 	if (cursorEl) cursorEl.hidden = true;
 }
 
-function updateSpectrogramCursor() {
-	const cursorEl = document.getElementById('spectrogramCursor');
-	if (!cursorEl || !wavesurfer || !spectrogramEl) return;
-	if (wavesurfer.getDuration() <= 0) return;
-	const scrollEl = getTimelineScrollElement();
-	const scrollLeft = scrollEl ? scrollEl.scrollLeft : 0;
-	const cursorX = wavesurfer.getCurrentTime() * currentMinPxPerSec - scrollLeft;
-	const containerWidth = spectrogramEl.clientWidth;
-	if (cursorX >= 0 && cursorX <= containerWidth) {
-		cursorEl.style.left = cursorX + 'px';
-		cursorEl.hidden = false;
-	} else {
-		cursorEl.hidden = true;
-	}
-}
-
 
 
 function getTimelineScrollElement() {
@@ -142,7 +126,6 @@ function applyZoom(nextMinPxPerSec, anchorClientX) {
 		const zoomRatio = clamped / Math.max(0.0001, previousZoom);
 		const newScrollLeft = Math.max(0, anchorWorldBefore * zoomRatio - anchorX);
 		activeScrollTarget.scrollLeft = newScrollLeft;
-		updateSpectrogramCursor();
 	});
 }
 
@@ -284,15 +267,10 @@ function createWaveSurfer(audioUrl, startAtSec = 0, autoplay = false) {
 		} else {
 			sendInfo("Audio loaded.");
 		}
-		const scrollEl = getTimelineScrollElement();
-		if (scrollEl && !scrollEl._scrollSyncBound) {
-			scrollEl._scrollSyncBound = true;
-			scrollEl.addEventListener('scroll', () => updateSpectrogramCursor(), { passive: true });
-		}
-		updateSpectrogramCursor();
+
 	});
 
-	wavesurfer.on("timeupdate", () => updateSpectrogramCursor());
+
 
 	wavesurfer.on("loading", (percent) => {
 		sendInfo(`Loading audio... ${Math.max(0, Math.min(100, Math.round(percent)))}%`);

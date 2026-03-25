@@ -5,17 +5,27 @@
 		border: 2px solid var(--mei-outline);
 		border-radius: 6px;
 		display: flex;
-		align-items: center;
-		justify-content: center;
+		align-items: stretch;
+		justify-content: flex-start;
 		text-align: center;
 		padding: 10px;
 		font-size: 20px;
 		font-weight: 600;
 		color: var(--mei-outline);
 		min-height: 100px;
+		background: #ffffff;
+		overflow: auto;
+	}
+
+	.mei-svg-host {
+		min-width: max-content;
+		min-height: 100%;
+	}
+
+	.mei-svg-host svg {
+		display: block;
+		background: #ffffff;
 	}
 </style>
 
-<section class="mei-area" aria-label="MEI Placeholder">
-	This Is the Area for the MEI SCORE!
-</section>
+<section class="mei-area" aria-label="MEI Placeholder"></section>
