@@ -139,12 +139,57 @@ body {
 	border: 1px solid #5a4d00;
 	background: #101010;
 	overflow: hidden;
+	position: relative;
 }
 
 #spectrogramCanvas .canvases {
 	display: none !important;
 	height: 0 !important;
 	min-height: 0 !important;
+}
+
+.spectrogram-playback-cursor {
+	position: absolute;
+	top: 24px;
+	bottom: 0;
+	left: 0;
+	width: 2px;
+	background: #00e5ff;
+	box-shadow: 0 0 6px rgba(0, 229, 255, 0.75);
+	pointer-events: none;
+	z-index: 4;
+}
+
+.spectrogram-time-ruler {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	height: 24px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+	background: rgba(0, 0, 0, 0.62);
+	pointer-events: none;
+	z-index: 5;
+}
+
+.spectrogram-time-tick {
+	position: absolute;
+	top: 0;
+	width: 1px;
+	height: 7px;
+	background: rgba(255, 255, 255, 0.7);
+	transform: translateX(-0.5px);
+}
+
+.spectrogram-time-label {
+	position: absolute;
+	top: 9px;
+	transform: translateX(-50%);
+	font-size: 14px;
+	line-height: 1;
+	color: #e7e7e7;
+	white-space: nowrap;
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 .mei-area {
