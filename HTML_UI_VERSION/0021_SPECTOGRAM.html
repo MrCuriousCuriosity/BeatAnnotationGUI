@@ -1,5 +1,5 @@
 <section class="spectogram-area" aria-label="Spectogram Placeholder">
-	<label>Zoom: <input type="range" min="1" max="100" value="10" /></label>
+	<div id="timelineDiv" class="timeline-div"></div>
 	<div id="spectrogramCanvas" class="spectrogram-canvas"></div>
 </section>
 
@@ -16,16 +16,22 @@
 		min-height: 0;
 		overflow: hidden;
 	}
-
-	.spectrogram-canvas {
-		flex: 1;
+	.timeline-div {
+		flex: 0.05;
 		width: 100%;
 		min-height: 0;
 		max-height: 100%;
-		border: 1px solid #5a4d00;
-		background: #101010;
+	}
+
+	.spectrogram-canvas {
+		flex: 0.95;
+		width: 100%;
+		min-height: 0;
+		max-height: 100%;
 		overflow: hidden;
 		position: relative;
+		box-sizing: border-box;
+		padding-block: 12px;
 	}
 
 </style>

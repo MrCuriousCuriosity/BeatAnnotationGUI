@@ -5,38 +5,22 @@ const BA_spectrogramSettings = (() => {
 		colormap: null,
 		minFreq: null,
 		maxFreq: null,
-		winLen: null,
-		hopLen: null,
 		dbRange: null,
-
-		melRows: null,
-		renderCols: null,
 	};
 
 	let onApply = null;
 	let onChange = null;
 	let ready = null;
 
-	function nearestPowerOfTwo(value, min, max) {
-		const clamped = Math.max(min, Math.min(max, Number(value) || min));
-		const exponent = Math.round(Math.log2(clamped));
-		const pow = 2 ** exponent;
-		return Math.max(min, Math.min(max, pow));
-	}
-
 	function read() {
 		if (!elements.colormap) {
 			return {
 				colormap: "roseus",
 				frequencyMin: 20,
-				frequencyMax: 6000,
-				fftSamples: 2048,
+				frequencyMax: 4000,
 				rangeDB: 60,
 				normalize: true,
 				scale: "linear",
-				melRows: 768,
-				renderCols: 4096,
-				noverlap: 1536,
 			};
 		}
 
@@ -46,24 +30,13 @@ const BA_spectrogramSettings = (() => {
 			maxFreq = minFreq + 1;
 		}
 
-		const winLenRaw = Number(elements.winLen.value);
-		const hopLenRaw = Number(elements.hopLen.value);
-		const fftSamples = nearestPowerOfTwo(winLenRaw, 256, 8192);
-		const hopLen = Math.max(1, Math.min(fftSamples - 1, hopLenRaw));
-		const noverlap = Math.max(0, fftSamples - hopLen);
-		const scale = "linear";
-
 		return {
 			colormap: elements.colormap.value,
 			frequencyMin: minFreq,
 			frequencyMax: maxFreq,
-			fftSamples,
 			rangeDB: Number(elements.dbRange.value),
 			normalize: true,
-			scale,
-			melRows: Number(elements.melRows.value),
-			renderCols: Number(elements.renderCols.value),
-			noverlap,
+			scale: "linear",
 		};
 	}
 
@@ -116,12 +89,7 @@ const BA_spectrogramSettings = (() => {
 		elements.colormap = document.getElementById("colormap");
 		elements.minFreq = document.getElementById("minFreq");
 		elements.maxFreq = document.getElementById("maxFreq");
-		elements.winLen = document.getElementById("winLen");
-		elements.hopLen = document.getElementById("hopLen");
 		elements.dbRange = document.getElementById("dbRange");
-
-		elements.melRows = document.getElementById("melRows");
-		elements.renderCols = document.getElementById("renderCols");
 	}
 
 	async function loadModalMarkup() {

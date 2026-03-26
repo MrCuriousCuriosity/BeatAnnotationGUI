@@ -26,13 +26,18 @@ function handleCommand(command) {
 			sendInfo("YouTube loading was not implemented yet");
 			break;
 		case "open-settings":
-			sendInfo("Settings menu is disabled.");
+			sendInfo("Settings Menu IS NOT SET YET!");
+            Promise.resolve(window.BA_spectrogramSettings?.ready)
+                .then(() => {
+                    window.BA_spectrogramSettings?.open?.();
+                })
+                .catch((error) => console.error("Could not open settings menu:", error));
 			break;
 		case "play-toggle":
-			sendInfo("Play/pause button hit.");
+			sendInfo("This Play/Pause button does not havefunciton yet. You canhit the audio to play/pause.");
 			break;
 		case "stop":
-			sendInfo("Add your WaveSurfer stop logic here.");
+			sendInfo("The Stop button was not implemented yet.");
 			break;
 		case "quit":
 			sendInfo("Select an audio file to render spectrogram.");
