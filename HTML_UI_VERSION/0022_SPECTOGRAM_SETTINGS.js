@@ -8,8 +8,7 @@ const BA_spectrogramSettings = (() => {
 		winLen: null,
 		hopLen: null,
 		dbRange: null,
-		normalize: null,
-		melView: null,
+
 		melRows: null,
 		renderCols: null,
 	};
@@ -52,7 +51,7 @@ const BA_spectrogramSettings = (() => {
 		const fftSamples = nearestPowerOfTwo(winLenRaw, 256, 8192);
 		const hopLen = Math.max(1, Math.min(fftSamples - 1, hopLenRaw));
 		const noverlap = Math.max(0, fftSamples - hopLen);
-		const scale = elements.melView.checked ? "mel" : "linear";
+		const scale = "linear";
 
 		return {
 			colormap: elements.colormap.value,
@@ -60,7 +59,7 @@ const BA_spectrogramSettings = (() => {
 			frequencyMax: maxFreq,
 			fftSamples,
 			rangeDB: Number(elements.dbRange.value),
-			normalize: elements.normalize.checked,
+			normalize: true,
 			scale,
 			melRows: Number(elements.melRows.value),
 			renderCols: Number(elements.renderCols.value),
@@ -120,8 +119,7 @@ const BA_spectrogramSettings = (() => {
 		elements.winLen = document.getElementById("winLen");
 		elements.hopLen = document.getElementById("hopLen");
 		elements.dbRange = document.getElementById("dbRange");
-		elements.normalize = document.getElementById("normalize");
-		elements.melView = document.getElementById("melView");
+
 		elements.melRows = document.getElementById("melRows");
 		elements.renderCols = document.getElementById("renderCols");
 	}
