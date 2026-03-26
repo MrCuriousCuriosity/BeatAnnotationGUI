@@ -27,9 +27,10 @@ window.addEventListener("audioFileSelected", (event) => {
 		frequencyMin: 20,
 		//fftSamples: 1024,
 		gainDB: 20,
+		dbRange: 60,
 		scale: "mel",
 		windowFunc: 'hann',
-		maxCanvasWidth: 30000,
+	
     });
     
     const wavesurfer = window.WaveSurfer.create({
@@ -39,7 +40,25 @@ window.addEventListener("audioFileSelected", (event) => {
         height: 0, //HIDE WAVEFORM, this is for displaying the spectrogram only.
         plugins: [spectrogramPlugin],
     });
+
+	//Zoom functionality for spectrogram
+	wavesurfer.once('decode', () => {
+		const slider = document.querySelector('input[type="range"]')
+		slider.addEventListener('input', (e) => {
+			const minPxPerSec = e.target.valueAsNumber
+			wavesurfer.zoom(minPxPerSec)
+		})
+	})
+
+
+	// Track loading progress, keep coments in line, i prefer this like it is
+	wavesurfer.on('loading', (percent) => {console.log(`Audio loading: ${percent}%`);});
+	wavesurfer.on('ready', () => {console.log("✓ WaveSurfer ready, decoding audio...");});
+	wavesurfer.on('decode', () => {console.log("✓ Audio decoded, spectrogram rendering complete");});
 });
+
+
+
 
 // Load spectrogram HTML from 0021_SPECTOGRAM.html
 fetch("0021_SPECTOGRAM.html")
