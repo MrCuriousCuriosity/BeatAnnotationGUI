@@ -46,19 +46,21 @@ window.addEventListener("audioFileSelected", (event) => {
 	}
 
 	// Create one top timeline using the spectrogram container as insertion anchor.
+	// const TimelinePlugin = window.WaveSurfer.Timeline;
+	// const topTimeline = TimelinePlugin.create({
+	// 	container: "#spectrogramCanvas",
+	// 	insertPosition: "beforebegin",
+	// 	height: 30,
+	// 	timeInterval: 0.2,
+	// 	primaryLabelInterval: 5,
+	// 	secondaryLabelInterval: 1,
+	// 	style: {
+	// 		fontSize: "20px",
+	// 		color: "#33ff00",
+	// 	},
+	// });
+
 	const TimelinePlugin = window.WaveSurfer.Timeline;
-	const topTimeline = TimelinePlugin.create({
-		container: "#timelineDiv",
-		//insertPosition: "beforebegin",
-		height: 30,
-		timeInterval: 0.2,
-		primaryLabelInterval: 5,
-		secondaryLabelInterval: 1,
-		style: {
-			fontSize: "20px",
-			color: "#33ff00",
-		},
-	});
 
     const wavesurfer = window.WaveSurfer.create({
         container: "#spectrogramCanvas",
@@ -66,7 +68,20 @@ window.addEventListener("audioFileSelected", (event) => {
         sampleRate: 44100,
         height: 0, //HIDE WAVEFORM, this is for displaying the spectrogram only.
 		dragToSeek: true,
-        plugins: [spectrogramPlugin, topTimeline],
+        plugins: [
+			spectrogramPlugin,
+			TimelinePlugin.create({
+				//insertPosition: "beforebegin",
+				height: 30,
+				timeInterval: 0.2,
+				primaryLabelInterval: 5,
+				secondaryLabelInterval: 1,
+				style: {
+					fontSize: "20px",
+					color: "#33ff00",
+				},
+			}),
+		],
     });
 
 	wavesurfer.on("interaction", () => {
