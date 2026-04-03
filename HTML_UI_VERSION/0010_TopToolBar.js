@@ -34,13 +34,13 @@ function handleCommand(command) {
                 .catch((error) => console.error("Could not open settings menu:", error));
 			break;
 		case "play-toggle":
-			sendInfo("This Play/Pause button does not havefunciton yet. You canhit the audio to play/pause.");
+			sendInfo("This Play/Pause button does not havefunciton yet. You can hit the audio to play/pause.");
 			break;
 		case "stop":
 			sendInfo("The Stop button was not implemented yet.");
 			break;
 		case "quit":
-			sendInfo("Select an audio file to render spectrogram.");
+			sendInfo("Quit shall be removed");
 			break;
 		default:
 			break;
